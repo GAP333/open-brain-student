@@ -1,205 +1,294 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Open Brain</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js"></script>
+  <link rel="manifest" href="/manifest.json" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f0f;
-      color: #e5e5e5;
-      min-height: 100vh;
-      padding: 32px 16px;
-    }
-    .container { max-width: 680px; margin: 0 auto; }
-
-    header { margin-bottom: 32px; }
-    h1 { font-size: 1.5rem; font-weight: 600; color: #fff; }
-    .status {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 0.8rem; color: #555; margin-top: 6px;
-    }
-    .dot {
-      width: 7px; height: 7px; border-radius: 50%; background: #333;
-      flex-shrink: 0; transition: background 0.3s;
-    }
-    .dot.connected { background: #22c55e; }
-    .dot.error { background: #ef4444; }
-
-    .banner {
-      background: #1a0a0a; border: 1px solid #3a1515; border-radius: 10px;
-      padding: 16px 18px; margin-bottom: 24px; font-size: 0.875rem;
-      color: #f87171; line-height: 1.6; display: none;
-    }
-    .banner code {
-      background: #2a1010; padding: 1px 6px; border-radius: 4px;
-      font-size: 0.8rem; font-family: monospace;
-    }
-
-    .capture {
-      background: #161616; border: 1px solid #222; border-radius: 12px;
-      padding: 20px; margin-bottom: 28px;
-    }
-    textarea {
-      width: 100%; background: #0f0f0f; border: 1px solid #252525;
-      border-radius: 8px; color: #e5e5e5; font-size: 0.95rem;
-      padding: 12px 14px; resize: vertical; min-height: 96px;
-      font-family: inherit; outline: none; transition: border-color 0.2s;
-      line-height: 1.5;
-    }
-    textarea:focus { border-color: #6366f1; }
-    textarea::placeholder { color: #383838; }
-    .row {
-      display: flex; align-items: center; gap: 12px; margin-top: 12px;
-    }
-    button {
-      background: #6366f1; color: #fff; border: none; border-radius: 8px;
-      padding: 9px 22px; font-size: 0.875rem; font-weight: 500;
-      cursor: pointer; transition: background 0.15s; white-space: nowrap;
-    }
-    button:hover:not(:disabled) { background: #5254cc; }
-    button:disabled { background: #1e1e1e; color: #444; cursor: not-allowed; }
-    .hint { font-size: 0.75rem; color: #444; }
-    .save-msg { font-size: 0.8rem; min-height: 16px; }
-    .save-msg.ok { color: #22c55e; }
-    .save-msg.err { color: #ef4444; }
-
-    .section-label {
-      font-size: 0.7rem; font-weight: 600; color: #444;
-      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
-    }
-    .thought {
-      background: #161616; border: 1px solid #1e1e1e; border-radius: 10px;
-      padding: 16px 18px; margin-bottom: 8px;
-    }
-    .thought-text { font-size: 0.9rem; color: #ccc; line-height: 1.55; white-space: pre-wrap; }
-    .thought-time { font-size: 0.72rem; color: #444; margin-top: 8px; }
-    .empty { color: #333; font-size: 0.875rem; text-align: center; padding: 48px 0; }
+    body { background: #0f0f0f; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+    .header { padding: 20px 24px 0; display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 1.3rem; font-weight: 600; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; flex-shrink: 0; }
+    .status-dot.connected { background: #22c55e; }
+    nav { display: flex; gap: 4px; padding: 16px 24px 0; overflow-x: auto; }
+    nav button { background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; white-space: nowrap; transition: all 0.15s; }
+    nav button.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+    nav button:hover:not(.active) { background: #222; color: #ddd; }
+    .tab { display: none; padding: 20px 24px 40px; max-width: 720px; }
+    .tab.active { display: block; }
+    textarea, input[type="text"], input[type="url"] { width: 100%; background: #161616; border: 1px solid #2a2a2a; color: #e5e5e5; border-radius: 10px; padding: 14px; font-size: 0.95rem; resize: vertical; font-family: inherit; outline: none; transition: border 0.15s; }
+    textarea:focus, input:focus { border-color: #6366f1; }
+    textarea { min-height: 120px; }
+    .btn { background: #6366f1; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: background 0.15s; margin-top: 10px; }
+    .btn:hover { background: #5254d4; }
+    .btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+    .btn.secondary { background: #222; border: 1px solid #2a2a2a; color: #aaa; }
+    .card { background: #161616; border: 1px solid #222; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+    .card .meta { font-size: 0.75rem; color: #555; margin-top: 8px; }
+    .card .content { font-size: 0.9rem; line-height: 1.55; color: #d4d4d4; white-space: pre-wrap; word-break: break-word; }
+    .label { font-size: 0.8rem; color: #888; margin-bottom: 6px; margin-top: 14px; display: block; }
+    .mic-btn { width: 80px; height: 80px; border-radius: 50%; background: #6366f1; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 20px auto; transition: transform 0.1s, background 0.1s; }
+    .mic-btn.listening { background: #ef4444; animation: pulse 1s infinite; }
+    .mic-btn:hover { transform: scale(1.05); }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)} 50%{box-shadow:0 0 0 14px rgba(239,68,68,0)} }
+    .voice-status { text-align: center; color: #888; font-size: 0.85rem; margin-bottom: 12px; }
+    .drop-zone { border: 2px dashed #2a2a2a; border-radius: 10px; padding: 40px 20px; text-align: center; color: #555; cursor: pointer; transition: border 0.15s; }
+    .drop-zone:hover, .drop-zone.dragover { border-color: #6366f1; color: #aaa; }
+    .drop-zone input { display: none; }
+    .search-wrap { display: flex; gap: 8px; margin-bottom: 16px; }
+    .search-wrap input { flex: 1; }
+    #search-results .empty { color: #555; font-size: 0.9rem; padding: 20px 0; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #000; padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+    .toast.error { background: #ef4444; color: #fff; }
+    .toast.show { opacity: 1; }
+    .yt-preview { display: flex; gap: 12px; align-items: center; background: #1a1a1a; border-radius: 8px; padding: 10px; margin: 10px 0; }
+    .yt-preview img { width: 80px; height: 45px; border-radius: 4px; object-fit: cover; }
+    .yt-preview .yt-title { font-size: 0.85rem; color: #d4d4d4; }
+    .progress { background: #222; border-radius: 4px; height: 6px; margin: 10px 0; overflow: hidden; }
+    .progress-bar { height: 100%; background: #6366f1; transition: width 0.3s; }
   </style>
 </head>
 <body>
-<div class="container">
-
-  <header>
-    <h1>🧠 My Open Brain</h1>
-    <div class="status">
-      <div class="dot" id="dot"></div>
-      <span id="statusText">Connecting...</span>
-    </div>
-  </header>
-
-  <div class="banner" id="banner"></div>
-
-  <div class="capture">
-    <textarea id="input" placeholder="Capture anything — ideas, notes, things you learned, questions, plans..." rows="4"></textarea>
-    <div class="row">
-      <button id="saveBtn" onclick="save()" disabled>Save to Brain</button>
-      <span class="hint">or Ctrl+Enter</span>
-      <span class="save-msg" id="saveMsg"></span>
-    </div>
-  </div>
-
-  <div class="section-label">Recent Thoughts</div>
-  <div id="list"><div class="empty">Loading...</div></div>
-
+<div class="header">
+  <div class="status-dot" id="dot"></div>
+  <h1>🧠 My Open Brain</h1>
 </div>
+<nav>
+  <button class="active" onclick="showTab('note')">✏️ Note</button>
+  <button onclick="showTab('voice')">🎙️ Voice</button>
+  <button onclick="showTab('youtube')">📹 YouTube</button>
+  <button onclick="showTab('pdf')">📄 PDF</button>
+  <button onclick="showTab('url')">🔗 URL</button>
+  <button onclick="showTab('search')">🔍 Search</button>
+  <button onclick="showTab('recent')">🕐 Recent</button>
+</nav>
+<div class="tab active" id="tab-note">
+  <span class="label">Capture a thought</span>
+  <textarea id="note-text" placeholder="Type anything — ideas, tasks, things you learned..."></textarea>
+  <button class="btn" onclick="saveNote()">Save to Brain</button>
+</div>
+<div class="tab" id="tab-voice">
+  <p style="color:#888;font-size:0.85rem;margin-bottom:4px;">Speak your thought — it transcribes automatically. Works best in Chrome.</p>
+  <button class="mic-btn" id="mic-btn" onclick="toggleVoice()">🎙️</button>
+  <p class="voice-status" id="voice-status">Tap mic to start</p>
+  <span class="label">Transcript (edit before saving)</span>
+  <textarea id="voice-text" placeholder="Your words will appear here..."></textarea>
+  <button class="btn" onclick="saveVoice()">Save to Brain</button>
+</div>
+<div class="tab" id="tab-youtube">
+  <span class="label">YouTube URL</span>
+  <input type="url" id="yt-url" placeholder="https://youtube.com/watch?v=..." />
+  <button class="btn" onclick="loadYouTube()">Load Video</button>
+  <div id="yt-preview" style="display:none"></div>
+  <div id="yt-transcript-section" style="display:none">
+    <span class="label">Paste the transcript below</span>
+    <p style="color:#666;font-size:0.8rem;margin-bottom:8px;">On YouTube, click the <strong style="color:#aaa">⋯ menu</strong> under the video → <strong style="color:#aaa">Show transcript</strong> → select all text and copy it here.</p>
+    <textarea id="yt-transcript" placeholder="Paste transcript here..."></textarea>
+    <button class="btn" onclick="saveYouTube()">Save to Brain</button>
+  </div>
+</div>
+<div class="tab" id="tab-pdf">
+  <span class="label">Upload a PDF</span>
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('pdf-input').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+    <input type="file" id="pdf-input" accept=".pdf" onchange="handlePDF(this.files[0])" />
+    <p style="font-size:1.5rem;margin-bottom:8px">📄</p>
+    <p>Click to choose a PDF or drag & drop it here</p>
+  </div>
+  <div id="pdf-progress" style="display:none">
+    <div class="progress"><div class="progress-bar" id="pdf-bar" style="width:0%"></div></div>
+    <p style="color:#888;font-size:0.8rem" id="pdf-status">Extracting text...</p>
+  </div>
+  <div id="pdf-result" style="display:none">
+    <span class="label">Extracted text (edit if needed)</span>
+    <textarea id="pdf-text" style="min-height:160px"></textarea>
+    <button class="btn" onclick="savePDF()">Save to Brain</button>
+  </div>
+</div>
+<div class="tab" id="tab-url">
+  <span class="label">Page URL</span>
+  <input type="url" id="url-input" placeholder="https://example.com/article" />
+  <span class="label" style="margin-top:14px">Paste the article/page content</span>
+  <p style="color:#666;font-size:0.8rem;margin-bottom:8px;">Select all text on the page (Cmd+A / Ctrl+A), copy it, and paste here.</p>
+  <textarea id="url-content" placeholder="Paste page content here..."></textarea>
+  <button class="btn" onclick="saveURL()">Save to Brain</button>
+</div>
+<div class="tab" id="tab-search">
+  <div class="search-wrap">
+    <input type="text" id="search-input" placeholder="Search your brain..." onkeydown="if(event.key==='Enter')doSearch()" />
+    <button class="btn" style="margin:0" onclick="doSearch()">Search</button>
+  </div>
+  <div id="search-results"><p class="empty">Type something and press Search</p></div>
+</div>
+<div class="tab" id="tab-recent">
+  <p style="color:#555;font-size:0.8rem;margin-bottom:14px">Last 20 captures</p>
+  <div id="recent-list"><p style="color:#555">Loading...</p></div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="config.js"></script>
 <script>
-  let db = null
-
-  function showBanner(html) {
-    const b = document.getElementById('banner')
-    b.innerHTML = html
-    b.style.display = 'block'
-    document.getElementById('dot').className = 'dot error'
-    document.getElementById('statusText').textContent = 'Not connected'
+const db = {
+  async insert(content) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/thoughts`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ content })
+    });
+    return r.ok;
+  },
+  async recent() {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/thoughts?order=created_at.desc&limit=20`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    return r.ok ? r.json() : [];
+  },
+  async search(q) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/thoughts?content=ilike.*${encodeURIComponent(q)}*&order=created_at.desc&limit=30`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    return r.ok ? r.json() : [];
   }
-
-  async function init() {
-    if (typeof SUPABASE_URL === 'undefined' || SUPABASE_URL.includes('PASTE_YOUR')) {
-      showBanner('Setup not complete. Open <code>config.js</code> and replace the two placeholder values with your Supabase URL and anon key.')
-      document.getElementById('list').innerHTML = ''
-      return
+};
+(async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/thoughts?limit=1`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    if (r.ok) document.getElementById('dot').classList.add('connected');
+  } catch {}
+})();
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'recent') loadRecent();
+}
+function toast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+function renderCards(items, container) {
+  if (!items.length) { container.innerHTML = '<p style="color:#555;font-size:0.9rem;padding:20px 0">Nothing found</p>'; return; }
+  container.innerHTML = items.map(i => `<div class="card"><div class="content">${escHtml(i.content.slice(0,600))}${i.content.length>600?'…':''}</div><div class="meta">${new Date(i.created_at).toLocaleString()}</div></div>`).join('');
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+async function saveNote() {
+  const t = document.getElementById('note-text').value.trim();
+  if (!t) return toast('Write something first', true);
+  if (await db.insert(t)) { document.getElementById('note-text').value = ''; toast('✓ Saved to brain'); }
+  else toast('Save failed — check connection', true);
+}
+let recognition, isListening = false;
+function toggleVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Voice not supported — use Chrome or Edge', true); return; }
+  if (isListening) { recognition.stop(); return; }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  let final = '';
+  recognition.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
     }
+    document.getElementById('voice-text').value = final + interim;
+  };
+  recognition.onend = () => { isListening = false; document.getElementById('mic-btn').className = 'mic-btn'; document.getElementById('voice-status').textContent = 'Done — review and save'; };
+  recognition.start();
+  isListening = true;
+  document.getElementById('mic-btn').className = 'mic-btn listening';
+  document.getElementById('voice-status').textContent = 'Listening…';
+}
+async function saveVoice() {
+  const t = document.getElementById('voice-text').value.trim();
+  if (!t) return toast('Nothing to save yet', true);
+  if (await db.insert('🎙️ Voice note: ' + t)) { document.getElementById('voice-text').value = ''; toast('✓ Saved to brain'); }
+  else toast('Save failed', true);
+}
+let ytTitle = '';
+async function loadYouTube() {
+  const url = document.getElementById('yt-url').value.trim();
+  const match = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (!match) { toast('Paste a valid YouTube URL', true); return; }
+  const id = match[1];
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?url=https://youtube.com/watch?v=${id}&format=json`);
+    const d = await r.json();
+    ytTitle = d.title;
+    document.getElementById('yt-preview').style.display = 'flex';
+    document.getElementById('yt-preview').innerHTML = `<div class="yt-preview"><img src="https://img.youtube.com/vi/${id}/mqdefault.jpg" /><div><div class="yt-title">${escHtml(d.title)}</div><a href="https://youtube.com/watch?v=${id}" target="_blank" style="font-size:0.75rem;color:#6366f1">Open on YouTube →</a></div></div>`;
+    document.getElementById('yt-transcript-section').style.display = 'block';
+  } catch { toast('Could not load video info — check URL', true); }
+}
+async function saveYouTube() {
+  const t = document.getElementById('yt-transcript').value.trim();
+  if (!t) return toast('Paste the transcript first', true);
+  if (await db.insert(`📹 YouTube: ${ytTitle}\n\n${t}`)) { document.getElementById('yt-transcript').value = ''; document.getElementById('yt-url').value = ''; document.getElementById('yt-preview').style.display='none'; document.getElementById('yt-transcript-section').style.display='none'; toast('✓ Saved to brain'); }
+  else toast('Save failed', true);
+}
+let pdfFilename = '';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+function dragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('dragover'); }
+function dragLeave() { document.getElementById('drop-zone').classList.remove('dragover'); }
+function dropFile(e) { e.preventDefault(); dragLeave(); const f = e.dataTransfer.files[0]; if (f && f.type === 'application/pdf') handlePDF(f); else toast('Drop a PDF file', true); }
+async function handlePDF(file) {
+  if (!file) return;
+  pdfFilename = file.name;
+  document.getElementById('pdf-progress').style.display = 'block';
+  document.getElementById('pdf-result').style.display = 'none';
+  const bar = document.getElementById('pdf-bar');
+  const status = document.getElementById('pdf-status');
+  const reader = new FileReader();
+  reader.onload = async e => {
     try {
-      db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-      const { error } = await db.from('thoughts').select('id').limit(1)
-      if (error) throw error
-      document.getElementById('dot').className = 'dot connected'
-      document.getElementById('statusText').textContent = 'Connected to your database'
-      document.getElementById('saveBtn').disabled = false
-      await load()
-    } catch (e) {
-      showBanner('Could not connect to your database.<br><br>Error: <code>' + e.message + '</code><br><br>Check that your URL and anon key in <code>config.js</code> are correct and that you ran the migration SQL in Supabase.')
-      document.getElementById('list').innerHTML = ''
-    }
-  }
-
-  async function save() {
-    const input = document.getElementById('input')
-    const text = input.value.trim()
-    if (!text) return
-    const btn = document.getElementById('saveBtn')
-    const msg = document.getElementById('saveMsg')
-    btn.disabled = true
-    btn.textContent = 'Saving...'
-    msg.textContent = ''
-    msg.className = 'save-msg'
-    try {
-      const { error } = await db.from('thoughts').insert({ content: text })
-      if (error) throw error
-      input.value = ''
-      msg.textContent = '✓ Saved'
-      msg.className = 'save-msg ok'
-      await load()
-    } catch (e) {
-      msg.textContent = '✗ ' + e.message
-      msg.className = 'save-msg err'
-    } finally {
-      btn.disabled = false
-      btn.textContent = 'Save to Brain'
-    }
-  }
-
-  async function load() {
-    const list = document.getElementById('list')
-    try {
-      const { data, error } = await db
-        .from('thoughts').select('*')
-        .order('created_at', { ascending: false }).limit(20)
-      if (error) throw error
-      if (!data || data.length === 0) {
-        list.innerHTML = '<div class="empty">No thoughts yet. Write something above.</div>'
-        return
+      const pdf = await pdfjsLib.getDocument({ data: e.target.result }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        bar.style.width = (i / pdf.numPages * 100) + '%';
+        status.textContent = `Extracting page ${i} of ${pdf.numPages}…`;
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(s => s.str).join(' ') + '\n';
       }
-      list.innerHTML = data.map(t => `
-        <div class="thought">
-          <div class="thought-text">${esc(t.content)}</div>
-          <div class="thought-time">${fmt(t.created_at)}</div>
-        </div>`).join('')
-    } catch (e) {
-      list.innerHTML = '<div class="empty" style="color:#ef4444">Could not load: ' + e.message + '</div>'
-    }
-  }
-
-  document.getElementById('input').addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save()
-  })
-
-  function esc(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-  }
-  function fmt(iso) {
-    return new Date(iso).toLocaleString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    })
-  }
-
-  init()
+      document.getElementById('pdf-text').value = text.trim();
+      document.getElementById('pdf-progress').style.display = 'none';
+      document.getElementById('pdf-result').style.display = 'block';
+    } catch { toast('Could not read PDF', true); document.getElementById('pdf-progress').style.display = 'none'; }
+  };
+  reader.readAsArrayBuffer(file);
+}
+async function savePDF() {
+  const t = document.getElementById('pdf-text').value.trim();
+  if (!t) return toast('No text to save', true);
+  if (await db.insert(`📄 PDF: ${pdfFilename}\n\n${t}`)) { document.getElementById('pdf-text').value = ''; document.getElementById('pdf-result').style.display='none'; toast('✓ Saved to brain'); }
+  else toast('Save failed', true);
+}
+async function saveURL() {
+  const url = document.getElementById('url-input').value.trim();
+  const content = document.getElementById('url-content').value.trim();
+  if (!content) return toast('Paste the page content first', true);
+  if (await db.insert(`🔗 URL: ${url}\n\n${content}`)) { document.getElementById('url-input').value = ''; document.getElementById('url-content').value = ''; toast('✓ Saved to brain'); }
+  else toast('Save failed', true);
+}
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  const results = await db.search(q);
+  renderCards(results, document.getElementById('search-results'));
+}
+async function loadRecent() {
+  const items = await db.recent();
+  renderCards(items, document.getElementById('recent-list'));
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 </script>
 </body>
 </html>
