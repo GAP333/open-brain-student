@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How Grace's Open Brain Works</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      line-height: 1.7;
+    }
+
+    a { color: #7dd3a8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* NAV */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15,15,15,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid #222;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      height: 52px;
+    }
+    nav .logo { font-weight: 700; font-size: 15px; color: #fff; letter-spacing: -0.3px; }
+    nav .logo span { color: #7dd3a8; }
+    nav a { font-size: 13px; color: #888; transition: color 0.15s; }
+    nav a:hover { color: #e8e8e8; text-decoration: none; }
+
+    /* HERO */
+    .hero {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 96px 32px 64px;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: #1a2e22;
+      color: #7dd3a8;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+      border: 1px solid #2a4a35;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 6vw, 52px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .hero h1 span { color: #7dd3a8; }
+    .hero p {
+      font-size: 18px;
+      color: #aaa;
+      max-width: 580px;
+      margin-bottom: 36px;
+    }
+    .hero-stats {
+      display: flex;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+    .stat { }
+    .stat-number { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+    .stat-label { font-size: 12px; color: #666; margin-top: 2px; }
+
+    /* SECTIONS */
+    section {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 64px 32px;
+      border-top: 1px solid #1a1a1a;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #7dd3a8;
+      margin-bottom: 12px;
+    }
+    h2 {
+      font-size: clamp(22px, 4vw, 32px);
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.8px;
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+    .lead {
+      font-size: 16px;
+      color: #999;
+      margin-bottom: 40px;
+      max-width: 600px;
+    }
+
+    /* ARCHITECTURE DIAGRAM */
+    .arch {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 16px;
+      padding: 40px 32px;
+    }
+    .arch-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .arch-row:last-child { border-bottom: none; }
+    .arch-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      background: #1a1a1a;
+      border: 1px solid #282828;
+    }
+    .arch-text { flex: 1; }
+    .arch-name { font-size: 14px; font-weight: 700; color: #fff; }
+    .arch-desc { font-size: 13px; color: #666; margin-top: 2px; }
+    .arch-arrow {
+      text-align: center;
+      color: #333;
+      font-size: 18px;
+      padding: 4px 0;
+    }
+    .arch-tag {
+      font-size: 11px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #666;
+      padding: 3px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    /* LEVEL CARDS */
+    .levels {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .level-card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      transition: border-color 0.2s;
+    }
+    .level-card:hover { border-color: #2a4a35; }
+    .level-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: #1a2e22;
+      border: 1px solid #2a4a35;
+      color: #7dd3a8;
+      font-size: 13px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .level-body { flex: 1; }
+    .level-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .level-subtitle { font-size: 12px; color: #7dd3a8; font-weight: 600; margin-bottom: 8px; }
+    .level-desc { font-size: 13px; color: #777; line-height: 1.6; }
+    .level-tech {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .tech-chip {
+      font-size: 11px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #888;
+      padding: 3px 9px;
+      border-radius: 20px;
+    }
+
+    /* FLOW */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .flow-step {
+      display: flex;
+      gap: 20px;
+      position: relative;
+    }
+    .flow-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 40px;
+      flex-shrink: 0;
+    }
+    .flow-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #1a2e22;
+      border: 2px solid #7dd3a8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #7dd3a8;
+      flex-shrink: 0;
+    }
+    .flow-line {
+      width: 2px;
+      flex: 1;
+      background: #1e1e1e;
+      margin: 4px 0;
+      min-height: 32px;
+    }
+    .flow-content {
+      padding-bottom: 32px;
+      flex: 1;
+    }
+    .flow-step:last-child .flow-content { padding-bottom: 0; }
+    .flow-step:last-child .flow-line { display: none; }
+    .flow-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; padding-top: 4px; }
+    .flow-body { font-size: 13px; color: #777; line-height: 1.6; }
+
+    /* COMPONENTS GRID */
+    .components {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 560px) { .components { grid-template-columns: 1fr; } }
+    .component-card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 14px;
+      padding: 22px;
+      transition: border-color 0.2s;
+    }
+    .component-card:hover { border-color: #2a4a35; }
+    .component-icon { font-size: 24px; margin-bottom: 12px; }
+    .component-name { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .component-role { font-size: 11px; font-weight: 600; color: #7dd3a8; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+    .component-desc { font-size: 13px; color: #777; line-height: 1.6; }
+
+    /* TABLE */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead tr { border-bottom: 1px solid #222; }
+    th { text-align: left; padding: 10px 0; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.8px; }
+    td { padding: 14px 0; color: #999; border-bottom: 1px solid #181818; vertical-align: top; }
+    td:first-child { color: #e8e8e8; font-weight: 500; padding-right: 20px; }
+    td .green { color: #7dd3a8; font-weight: 700; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid #1a1a1a;
+      padding: 40px 32px;
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-left { font-size: 13px; color: #444; }
+    .footer-left strong { color: #888; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Open<span>Brain</span></div>
+  <a href="#how-it-works">How it works</a>
+  <a href="#what-i-built">What I built</a>
+  <a href="#components">Components</a>
+  <a href="#example">Real example</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Personal AI System</div>
+  <h1>How My <span>Open Brain</span> Works</h1>
+  <p>I built an AI system that captures everything I learn, automatically enriches it, and lets Claude search my knowledge natively — from any device, any time.</p>
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-number">5</div>
+      <div class="stat-label">levels built</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">6</div>
+      <div class="stat-label">live services</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">∞</div>
+      <div class="stat-label">thoughts captured</div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="section-label">The Big Picture</div>
+  <h2>Most AI tools forget everything. Mine remembers.</h2>
+  <p class="lead">Standard AI starts from zero every conversation. My system is different — Claude has access to every YouTube transcript, PDF, voice note, and idea I've ever captured. It knows what I know.</p>
+
+  <div class="arch">
+    <div class="arch-row">
+      <div class="arch-icon">🧠</div>
+      <div class="arch-text">
+        <div class="arch-name">Claude AI</div>
+        <div class="arch-desc">Reads, reasons, and searches my brain in every conversation</div>
+      </div>
+      <div class="arch-tag">Anthropic</div>
+    </div>
+    <div class="arch-arrow">↕</div>
+    <div class="arch-row">
+      <div class="arch-icon">🔌</div>
+      <div class="arch-text">
+        <div class="arch-name">MCP Server</div>
+        <div class="arch-desc">Open standard bridge — any MCP-compatible AI can connect</div>
+      </div>
+      <div class="arch-tag">Edge Function</div>
+    </div>
+    <div class="arch-arrow">↕</div>
+    <div class="arch-row">
+      <div class="arch-icon">🗄️</div>
+      <div class="arch-text">
+        <div class="arch-name">Supabase Database</div>
+        <div class="arch-desc">Every thought, transcript, note, and PDF stored and searchable</div>
+      </div>
+      <div class="arch-tag">PostgreSQL</div>
+    </div>
+    <div class="arch-arrow">↑</div>
+    <div class="arch-row">
+      <div class="arch-icon">⚡</div>
+      <div class="arch-text">
+        <div class="arch-name">Capture Layer</div>
+        <div class="arch-desc">Web app · Telegram bot · YouTube · PDF · Voice · URL</div>
+      </div>
+      <div class="arch-tag">Vercel + Supabase</div>
+    </div>
+    <div class="arch-arrow">↑</div>
+    <div class="arch-row">
+      <div class="arch-icon">🤖</div>
+      <div class="arch-text">
+        <div class="arch-name">Enrichment Agents</div>
+        <div class="arch-desc">Auto-tag, categorize, and summarize every capture within seconds</div>
+      </div>
+      <div class="arch-tag">OpenAI + pg_cron</div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT I BUILT -->
+<section id="what-i-built">
+  <div class="section-label">5 Levels</div>
+  <h2>What I built, level by level</h2>
+  <p class="lead">Each level added a new capability. Together they form a complete, self-running knowledge system.</p>
+
+  <div class="levels">
+    <div class="level-card">
+      <div class="level-num">0</div>
+      <div class="level-body">
+        <div class="level-title">The Foundation</div>
+        <div class="level-subtitle">Database + Schema</div>
+        <div class="level-desc">Set up a Supabase PostgreSQL database with a thoughts table. This is where everything lives — every YouTube transcript, PDF extract, voice note, and idea. The data is mine, not locked inside any app.</div>
+        <div class="level-tech">
+          <span class="tech-chip">Supabase</span>
+          <span class="tech-chip">PostgreSQL</span>
+          <span class="tech-chip">Row Level Security</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level-card">
+      <div class="level-num">1</div>
+      <div class="level-body">
+        <div class="level-title">The Web App</div>
+        <div class="level-subtitle">Capture Interface + PWA</div>
+        <div class="level-desc">Built and deployed a web app with 7 capture tabs: Text, Voice, YouTube, PDF, URL, Search, and Trending. Converted it to a Progressive Web App so it installs on my phone like a native app.</div>
+        <div class="level-tech">
+          <span class="tech-chip">Vercel</span>
+          <span class="tech-chip">HTML/CSS/JS</span>
+          <span class="tech-chip">PWA</span>
+          <span class="tech-chip">GitHub</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level-card">
+      <div class="level-num">2</div>
+      <div class="level-body">
+        <div class="level-title">The Telegram Bot</div>
+        <div class="level-subtitle">Capture Anywhere</div>
+        <div class="level-desc">Built a Telegram bot that saves anything I send it directly to the database. Text, ideas, links — send a message and it's in the brain instantly. Also supports /search and /recent commands.</div>
+        <div class="level-tech">
+          <span class="tech-chip">Telegram API</span>
+          <span class="tech-chip">Supabase Edge Functions</span>
+          <span class="tech-chip">Deno/TypeScript</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level-card">
+      <div class="level-num">3</div>
+      <div class="level-body">
+        <div class="level-title">The MCP Server</div>
+        <div class="level-subtitle">Claude Reads My Brain</div>
+        <div class="level-desc">Built an MCP server — an open standard that lets AI assistants connect to tools and data sources. Claude Desktop connects to it and can search my entire brain in any conversation. No manual copy-pasting.</div>
+        <div class="level-tech">
+          <span class="tech-chip">Model Context Protocol</span>
+          <span class="tech-chip">mcp-remote</span>
+          <span class="tech-chip">Claude Desktop</span>
+          <span class="tech-chip">JSON-RPC 2.0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level-card">
+      <div class="level-num">4</div>
+      <div class="level-body">
+        <div class="level-title">The Agents</div>
+        <div class="level-subtitle">Automation That Runs Without Me</div>
+        <div class="level-desc">Built two agents that run automatically. An enrichment agent tags, categorizes, and summarizes every new capture within seconds. A weekly digest agent reads my last 7 days and sends me a report on what I've been learning — every Sunday at 8am.</div>
+        <div class="level-tech">
+          <span class="tech-chip">OpenAI API</span>
+          <span class="tech-chip">LLM Gateway Pattern</span>
+          <span class="tech-chip">pg_cron</span>
+          <span class="tech-chip">Database Webhooks</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTS -->
+<section id="components">
+  <div class="section-label">Under the Hood</div>
+  <h2>Every piece and what it does</h2>
+  <p class="lead">Six components, each with a clear job. Like a well-run office where everyone knows their role.</p>
+
+  <div class="components">
+    <div class="component-card">
+      <div class="component-icon">🗄️</div>
+      <div class="component-name">Supabase</div>
+      <div class="component-role">The Memory</div>
+      <div class="component-desc">A PostgreSQL database in the cloud that stores every thought. I own the data. It never disappears when an app shuts down or changes its business model.</div>
+    </div>
+    <div class="component-card">
+      <div class="component-icon">🌐</div>
+      <div class="component-name">Vercel App</div>
+      <div class="component-role">The Capture Interface</div>
+      <div class="component-desc">A web app deployed to the internet with 7 ways to capture: type a note, record voice, paste a YouTube URL, upload a PDF, save a webpage, or search what's already stored.</div>
+    </div>
+    <div class="component-card">
+      <div class="component-icon">✈️</div>
+      <div class="component-name">Telegram Bot</div>
+      <div class="component-role">The Pocket Capture</div>
+      <div class="component-desc">Send any message to a bot in Telegram and it saves instantly to the database. Works from my phone in two seconds. No app switching required.</div>
+    </div>
+    <div class="component-card">
+      <div class="component-icon">🔌</div>
+      <div class="component-name">MCP Server</div>
+      <div class="component-role">The AI Bridge</div>
+      <div class="component-desc">An open-standard server that lets Claude (or any MCP-compatible AI) search and read my brain. Built on the Model Context Protocol — if I switch AI tools, I point them at the same server.</div>
+    </div>
+    <div class="component-card">
+      <div class="component-icon">⚡</div>
+      <div class="component-name">Enrichment Agent</div>
+      <div class="component-role">The Tagger</div>
+      <div class="component-desc">A webhook-triggered function that runs every time a new thought is saved. It calls an AI, gets back tags, a category, and a one-sentence summary — all stored with the thought automatically.</div>
+    </div>
+    <div class="component-card">
+      <div class="component-icon">📋</div>
+      <div class="component-name">Weekly Digest</div>
+      <div class="component-role">The Reporter</div>
+      <div class="component-desc">A scheduled job that runs every Sunday at 8am. It reads the last 7 days of captures, groups them by category, and writes a report on what I've been learning. Zero input from me.</div>
+    </div>
+  </div>
+</section>
+
+<!-- REAL EXAMPLE -->
+<section id="example">
+  <div class="section-label">Real Example</div>
+  <h2>What happens when I capture something</h2>
+  <p class="lead">Walking through what happens when I send a YouTube link to my Telegram bot.</p>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-left">
+        <div class="flow-dot">1</div>
+        <div class="flow-line"></div>
+      </div>
+      <div class="flow-content">
+        <div class="flow-title">I send a YouTube link to my Telegram bot</div>
+        <div class="flow-body">From my phone, I paste a YouTube URL into a conversation with my bot. Takes two seconds.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left">
+        <div class="flow-dot">2</div>
+        <div class="flow-line"></div>
+      </div>
+      <div class="flow-content">
+        <div class="flow-title">The bot extracts and saves the transcript</div>
+        <div class="flow-body">The Telegram bot edge function fetches the video transcript, formats it, and saves it to the Supabase database as a new thought. The bot replies "Saved to your brain."</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left">
+        <div class="flow-dot">3</div>
+        <div class="flow-line"></div>
+      </div>
+      <div class="flow-content">
+        <div class="flow-title">The enrichment agent triggers automatically</div>
+        <div class="flow-body">A database webhook fires the enrich-thought function. Within seconds it calls OpenAI, gets back 3–5 tags, a category (like "learning" or "reference"), and a one-sentence summary. These are written back to the row.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left">
+        <div class="flow-dot">4</div>
+        <div class="flow-line"></div>
+      </div>
+      <div class="flow-content">
+        <div class="flow-title">It becomes searchable by Claude</div>
+        <div class="flow-body">Later, in Claude Desktop, I ask about something from that video. Claude calls the search_thoughts MCP tool, finds the transcript, and answers using my own captured content — not a generic web search.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left">
+        <div class="flow-dot">5</div>
+        <div class="flow-line"></div>
+      </div>
+      <div class="flow-content">
+        <div class="flow-title">It shows up in Sunday's digest</div>
+        <div class="flow-body">On Sunday at 8am, the weekly digest agent reads everything from the last 7 days including this transcript, groups it with other captures, and writes a summary of what I've been focused on that week.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COST -->
+<section>
+  <div class="section-label">What it costs</div>
+  <h2>Real costs to run this</h2>
+  <p class="lead">Built on free tiers and open infrastructure. The only recurring cost is the AI API.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Service</th>
+        <th>Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Database</td>
+        <td>Supabase (free tier)</td>
+        <td><span class="green">Free</span></td>
+      </tr>
+      <tr>
+        <td>Web app hosting</td>
+        <td>Vercel (free tier)</td>
+        <td><span class="green">Free</span></td>
+      </tr>
+      <tr>
+        <td>Edge Functions</td>
+        <td>Supabase (free tier)</td>
+        <td><span class="green">Free</span></td>
+      </tr>
+      <tr>
+        <td>Telegram bot</td>
+        <td>Telegram API</td>
+        <td><span class="green">Free</span></td>
+      </tr>
+      <tr>
+        <td>MCP server</td>
+        <td>Supabase Edge Functions</td>
+        <td><span class="green">Free</span></td>
+      </tr>
+      <tr>
+        <td>AI enrichment + digests</td>
+        <td>OpenAI API (gpt-4o-mini)</td>
+        <td>~$1–2/month</td>
+      </tr>
+      <tr>
+        <td>Code repository</td>
+        <td>GitHub (free)</td>
+        <td><span class="green">Free</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  <div class="footer-left">
+    <strong>Grace Portale</strong> · Open Brain System · Built across 5 levels
+  </div>
+</footer>
+
+</body>
+</html>
