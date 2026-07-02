@@ -19,6 +19,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ skipped: true }), { headers: CORS });
     }
 
+    // Tasks use category for open/done status — enriching would clobber it.
+    if (record.type === "task") {
+      return new Response(JSON.stringify({ skipped: true, reason: "task" }), { headers: CORS });
+    }
+
     const prompt = "Analyze this text and respond with ONLY valid JSON in this exact format: {" +
       '"tags": ["tag1", "tag2", "tag3"], ' +
       '"category": "learning", ' +
