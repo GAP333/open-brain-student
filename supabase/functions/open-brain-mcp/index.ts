@@ -311,6 +311,17 @@ Deno.serve(async (req) => {
     else if (name === "list_tasks") result = text(await listTasks(args.include_done, args.bucket, args.limit));
     else if (name === "complete_task") result = text(await completeTask(args.id || ""));
     else result = text("Unknown tool: " + name);
+  } else if (method === "capture") {
+    // Flat, Shortcut-friendly capture: {"method":"capture","content":"...","bucket":"personal"}
+    // Say "task: ..." at the start to save a task instead of a note.
+    const raw = (body.content || "").trim();
+    if (!raw) {
+      result = { saved: false, error: "content is empty" };
+    } else if (/^task[:,]?\s/i.test(raw)) {
+      result = await addTask(raw.replace(/^task[:,]?\s+/i, ""), body.bucket);
+    } else {
+      result = { saved: await addEntry(raw, "thought", null, body.bucket) };
+    }
   } else if (method === "initialize") {
     result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "open-brain", version: "3.3.0" } };
   } else {
