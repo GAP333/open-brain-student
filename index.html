@@ -75,6 +75,8 @@
   <div id="brief-meetings"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
   <span class="label">🎯 Current focus</span>
   <div id="brief-state"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
+  <span class="label">🌙 Yesterday's recap</span>
+  <div id="brief-recap"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
   <span class="label">🕐 Latest captures</span>
   <div id="brief-recent"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
 </div>
@@ -198,15 +200,23 @@ async function loadBrief(force) {
   if (briefLoaded && !force) return;
   briefLoaded = true;
   document.getElementById('brief-date').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  if (force) ['brief-meetings','brief-state','brief-recent'].forEach(id => document.getElementById(id).innerHTML = '<p style="color:#555;font-size:0.9rem">Loading…</p>');
-  const [meetings, state, recent] = await Promise.all([
+  if (force) ['brief-meetings','brief-state','brief-recap','brief-recent'].forEach(id => document.getElementById(id).innerHTML = '<p style="color:#555;font-size:0.9rem">Loading…</p>');
+  const [meetings, state, recap, recent] = await Promise.all([
     mcp('get_upcoming_meetings', { days: 1 }),
     mcp('get_state'),
+    mcp('list_recent', { limit: 1, type: 'session' }),
     mcp('list_recent', { limit: 5 })
   ]);
   renderBriefMeetings(meetings);
   renderBriefState(state);
+  renderBriefRecap(recap);
   renderCards(recent || [], document.getElementById('brief-recent'));
+}
+function renderBriefRecap(rows) {
+  const el = document.getElementById('brief-recap');
+  const s = Array.isArray(rows) && rows.length ? rows[0] : null;
+  if (!s || !s.content) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">No recap yet — the evening recap runs at 9pm, or ask Claude to “recap my day”</p>'; return; }
+  el.innerHTML = `<div class="card"><div class="content">${escHtml(s.content)}</div><div class="meta">${s.title ? escHtml(s.title) + ' · ' : ''}Logged ${new Date(s.created_at).toLocaleString()}</div></div>`;
 }
 function renderBriefMeetings(m) {
   const el = document.getElementById('brief-meetings');
