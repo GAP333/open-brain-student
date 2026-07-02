@@ -1,7 +1,7 @@
 // Open Brain MCP Server v3 — structured memory + semantic search + Outlook calendar
 // Tools: search_brain (alias: search_thoughts), list_recent, add_thought,
 //        get_contact, update_contact, get_state, update_state, log_session,
-//        get_upcoming_meetings
+//        get_upcoming_meetings, add_task, list_tasks, complete_task
 //
 // Secrets required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MCP_ACCESS_KEY,
 //                   OPENAI_API_KEY, OUTLOOK_ICS_URL
@@ -79,6 +79,21 @@ const TOOLS = [
     name: "get_upcoming_meetings",
     description: "Get upcoming meetings from the connected Outlook (GCU) calendar. Optionally set days ahead to look (default 7).",
     inputSchema: { type: "object", properties: { days: { type: "number" } } },
+  },
+  {
+    name: "add_task",
+    description: "Add a to-do task. Optionally set the bucket (life compartment): gcu, legacy, school, or personal (default personal).",
+    inputSchema: { type: "object", properties: { content: { type: "string" }, bucket: { type: "string" } }, required: ["content"] },
+  },
+  {
+    name: "list_tasks",
+    description: "List open (not yet completed) tasks, newest first, with their bucket. Pass include_done=true to also include completed tasks, or bucket to filter to one compartment.",
+    inputSchema: { type: "object", properties: { include_done: { type: "boolean" }, bucket: { type: "string" }, limit: { type: "number" } } },
+  },
+  {
+    name: "complete_task",
+    description: "Mark a task as done by its id (from list_tasks).",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
   },
 ];
 
@@ -231,6 +246,37 @@ async function getUpcomingMeetings(days?: number) {
   return { count: events.length, days: days || 7, events: events.slice(0, 50) };
 }
 
+// --- Tasks (type=task; category tracks open/done; bucket = life compartment) ---
+const TASK_BUCKETS = ["gcu", "legacy", "school", "personal"];
+async function addTask(content: string, bucket?: string) {
+  const b = TASK_BUCKETS.includes((bucket || "").toLowerCase()) ? (bucket || "").toLowerCase() : "personal";
+  const res = await fetch(SUPABASE_URL + "/rest/v1/thoughts", {
+    method: "POST",
+    headers: { ...HEADERS, Prefer: "return=representation" },
+    body: JSON.stringify({ content, type: "task", bucket: b, category: "open" }),
+  });
+  const rows = await res.json();
+  const task = strip(Array.isArray(rows) ? rows : [rows])[0];
+  return { saved: !!task, task };
+}
+async function listTasks(includeDone?: boolean, bucket?: string, limit?: number) {
+  let url = SUPABASE_URL + "/rest/v1/thoughts?select=" + COLS + "&type=eq.task&order=created_at.desc&limit=" + (limit || 200);
+  if (bucket) url += "&bucket=eq." + encodeURIComponent(bucket.toLowerCase());
+  const res = await fetch(url, { headers: HEADERS });
+  const rows = await res.json();
+  if (!Array.isArray(rows)) return rows;
+  const tasks = strip(includeDone ? rows : rows.filter((r: { category?: string }) => r.category !== "done"));
+  return { count: tasks.length, tasks };
+}
+async function completeTask(id: string) {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/thoughts?id=eq." + encodeURIComponent(id), {
+    method: "PATCH",
+    headers: { ...HEADERS, Prefer: "return=minimal" },
+    body: JSON.stringify({ category: "done" }),
+  });
+  return { done: res.ok, id };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -261,9 +307,12 @@ Deno.serve(async (req) => {
     else if (name === "update_state") result = text(await upsertByTitle("state", "current", args.content || ""));
     else if (name === "log_session") result = text({ saved: await addEntry(args.content || "", "session", args.title || "Session " + new Date().toISOString().slice(0, 10)) });
     else if (name === "get_upcoming_meetings") result = text(await getUpcomingMeetings(args.days));
+    else if (name === "add_task") result = text(await addTask(args.content || "", args.bucket));
+    else if (name === "list_tasks") result = text(await listTasks(args.include_done, args.bucket, args.limit));
+    else if (name === "complete_task") result = text(await completeTask(args.id || ""));
     else result = text("Unknown tool: " + name);
   } else if (method === "initialize") {
-    result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "open-brain", version: "3.1.0" } };
+    result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "open-brain", version: "3.3.0" } };
   } else {
     result = { error: "Unknown method: " + method };
   }

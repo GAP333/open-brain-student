@@ -74,6 +74,7 @@
 </div>
 <nav>
   <button class="active" onclick="showTab('brief')">☀️ Brief</button>
+  <button onclick="showTab('tasks')">✅ Tasks</button>
   <button onclick="showTab('note')">✏️ Note</button>
   <button onclick="showTab('voice')">🎙️ Voice</button>
   <button onclick="showTab('youtube')">📹 YouTube</button>
@@ -94,6 +95,8 @@
     <p style="color:#555;font-size:0.8rem" id="brief-date"></p>
     <button class="btn secondary" style="margin:0;padding:6px 12px;font-size:0.75rem" onclick="loadBrief(true)">↻ Refresh</button>
   </div>
+  <span class="label">✅ Open tasks</span>
+  <div id="brief-tasks"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
   <span class="label">📅 Meetings (next 24 hours)</span>
   <div id="brief-meetings"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
   <span class="label">🎯 Current focus</span>
@@ -102,6 +105,20 @@
   <div id="brief-recap"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
   <span class="label">🕐 Latest captures</span>
   <div id="brief-recent"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
+</div>
+<div class="tab" id="tab-tasks">
+  <div class="search-wrap">
+    <input type="text" id="task-input" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTask()" />
+    <button class="btn" style="margin:0" onclick="addTask()">Add</button>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="task-bucket-picker">
+    <span class="bucket-label" style="font-size:0.75rem;color:#555;align-self:center">Bucket:</span>
+    <button class="chip b-gcu" onclick="setTaskBucket('gcu')">🏛️ GCU</button>
+    <button class="chip b-legacy" onclick="setTaskBucket('legacy')">🏗️ Legacy</button>
+    <button class="chip b-school" onclick="setTaskBucket('school')">📚 School</button>
+    <button class="chip b-personal" onclick="setTaskBucket('personal')">🏠 Personal</button>
+  </div>
+  <div id="task-list"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
 </div>
 <div class="tab" id="tab-note">
   <span class="label">Capture a thought</span>
@@ -242,23 +259,73 @@ function showTab(name) {
   document.getElementById('bucket-bar').classList.toggle('visible', CAPTURE_TABS.includes(name));
   if (name === 'recent') loadRecent();
   if (name === 'brief') loadBrief();
+  if (name === 'tasks') loadTasks();
+}
+let taskBucket = localStorage.getItem('task_bucket') || 'personal';
+function setTaskBucket(b) {
+  taskBucket = b;
+  localStorage.setItem('task_bucket', b);
+  document.querySelectorAll('#task-bucket-picker .chip').forEach(c => c.classList.toggle('active', c.classList.contains('b-' + b)));
+}
+async function addTask() {
+  const input = document.getElementById('task-input');
+  const t = input.value.trim();
+  if (!t) return toast('Type a task first', true);
+  const res = await mcp('add_task', { content: t, bucket: taskBucket });
+  if (res && res.saved) { input.value = ''; toast('✓ Task added'); loadTasks(); }
+  else toast('Could not add task', true);
+}
+async function loadTasks() {
+  const res = await mcp('list_tasks', {});
+  const el = document.getElementById('task-list');
+  if (!res || !Array.isArray(res.tasks)) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">Couldn\'t load tasks</p>'; return; }
+  if (!res.tasks.length) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">No open tasks — all clear 🎉</p>'; return; }
+  el.innerHTML = Object.keys(BUCKETS).map(b => {
+    const items = res.tasks.filter(t => (t.bucket || 'personal') === b);
+    if (!items.length) return '';
+    return `<span class="label">${BUCKETS[b]} (${items.length})</span>` + items.map(t =>
+      `<div class="card" style="display:flex;gap:12px;align-items:flex-start"><input type="checkbox" style="width:18px;height:18px;margin-top:2px;accent-color:#6366f1;cursor:pointer" onchange="finishTask('${t.id}', this)" /><div style="flex:1"><div class="content">${escHtml(t.content)}</div><div class="meta">Added ${new Date(t.created_at).toLocaleDateString()}</div></div></div>`
+    ).join('');
+  }).join('');
+}
+async function finishTask(id, box) {
+  box.disabled = true;
+  const res = await mcp('complete_task', { id });
+  if (res && res.done) {
+    toast('✓ Done');
+    const card = box.closest('.card');
+    card.style.opacity = '0.35';
+    card.querySelector('.content').style.textDecoration = 'line-through';
+  } else { box.checked = false; box.disabled = false; toast('Could not update task', true); }
 }
 let briefLoaded = false;
 async function loadBrief(force) {
   if (briefLoaded && !force) return;
   briefLoaded = true;
   document.getElementById('brief-date').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  if (force) ['brief-meetings','brief-state','brief-recap','brief-recent'].forEach(id => document.getElementById(id).innerHTML = '<p style="color:#555;font-size:0.9rem">Loading…</p>');
-  const [meetings, state, recap, recent] = await Promise.all([
+  if (force) ['brief-tasks','brief-meetings','brief-state','brief-recap','brief-recent'].forEach(id => document.getElementById(id).innerHTML = '<p style="color:#555;font-size:0.9rem">Loading…</p>');
+  const [tasks, meetings, state, recap, recent] = await Promise.all([
+    mcp('list_tasks', {}),
     mcp('get_upcoming_meetings', { days: 1 }),
     mcp('get_state'),
     mcp('list_recent', { limit: 1, type: 'session' }),
     mcp('list_recent', { limit: 5 })
   ]);
+  renderBriefTasks(tasks);
   renderBriefMeetings(meetings);
   renderBriefState(state);
   renderBriefRecap(recap);
   renderCards(recent || [], document.getElementById('brief-recent'));
+}
+function renderBriefTasks(res) {
+  const el = document.getElementById('brief-tasks');
+  if (!res || !Array.isArray(res.tasks)) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">Couldn\'t load tasks</p>'; return; }
+  if (!res.tasks.length) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">Nothing open — all clear 🎉</p>'; return; }
+  const byBucket = {};
+  res.tasks.forEach(t => { const b = t.bucket || 'personal'; (byBucket[b] = byBucket[b] || []).push(t); });
+  const counts = Object.keys(BUCKETS).filter(b => byBucket[b]).map(b => `<span class="badge b-${b}">${BUCKETS[b]} ${byBucket[b].length}</span>`).join('');
+  const top = res.tasks.slice(0, 5).map(t => `• ${escHtml(t.content)}`).join('<br>');
+  el.innerHTML = `<div class="card"><div class="content">${top}${res.tasks.length > 5 ? `<br><span style="color:#666">…and ${res.tasks.length - 5} more in the ✅ Tasks tab</span>` : ''}</div><div class="meta">${counts}</div></div>`;
 }
 function renderBriefRecap(rows) {
   const el = document.getElementById('brief-recap');
@@ -410,6 +477,7 @@ async function loadRecent() {
   renderCards(items, document.getElementById('recent-list'));
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+setTaskBucket(taskBucket);
 loadBrief();
 </script>
 </body>
