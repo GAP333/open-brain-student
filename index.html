@@ -57,7 +57,8 @@
   <h1>🧠 My Open Brain</h1>
 </div>
 <nav>
-  <button class="active" onclick="showTab('note')">✏️ Note</button>
+  <button class="active" onclick="showTab('brief')">☀️ Brief</button>
+  <button onclick="showTab('note')">✏️ Note</button>
   <button onclick="showTab('voice')">🎙️ Voice</button>
   <button onclick="showTab('youtube')">📹 YouTube</button>
   <button onclick="showTab('pdf')">📄 PDF</button>
@@ -65,7 +66,19 @@
   <button onclick="showTab('search')">🔍 Search</button>
   <button onclick="showTab('recent')">🕐 Recent</button>
 </nav>
-<div class="tab active" id="tab-note">
+<div class="tab active" id="tab-brief">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <p style="color:#555;font-size:0.8rem" id="brief-date"></p>
+    <button class="btn secondary" style="margin:0;padding:6px 12px;font-size:0.75rem" onclick="loadBrief(true)">↻ Refresh</button>
+  </div>
+  <span class="label">📅 Meetings (next 24 hours)</span>
+  <div id="brief-meetings"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
+  <span class="label">🎯 Current focus</span>
+  <div id="brief-state"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
+  <span class="label">🕐 Latest captures</span>
+  <div id="brief-recent"><p style="color:#555;font-size:0.9rem">Loading…</p></div>
+</div>
+<div class="tab" id="tab-note">
   <span class="label">Capture a thought</span>
   <textarea id="note-text" placeholder="Type anything — ideas, tasks, things you learned..."></textarea>
   <button class="btn" onclick="saveNote()">Save to Brain</button>
@@ -178,6 +191,40 @@ function showTab(name) {
   document.getElementById('tab-' + name).classList.add('active');
   event.target.classList.add('active');
   if (name === 'recent') loadRecent();
+  if (name === 'brief') loadBrief();
+}
+let briefLoaded = false;
+async function loadBrief(force) {
+  if (briefLoaded && !force) return;
+  briefLoaded = true;
+  document.getElementById('brief-date').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  if (force) ['brief-meetings','brief-state','brief-recent'].forEach(id => document.getElementById(id).innerHTML = '<p style="color:#555;font-size:0.9rem">Loading…</p>');
+  const [meetings, state, recent] = await Promise.all([
+    mcp('get_upcoming_meetings', { days: 1 }),
+    mcp('get_state'),
+    mcp('list_recent', { limit: 5 })
+  ]);
+  renderBriefMeetings(meetings);
+  renderBriefState(state);
+  renderCards(recent || [], document.getElementById('brief-recent'));
+}
+function renderBriefMeetings(m) {
+  const el = document.getElementById('brief-meetings');
+  if (!m || m.error) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">Couldn\'t load the calendar right now</p>'; return; }
+  if (!m.events || !m.events.length) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">No meetings in the next 24 hours 🎉</p>'; return; }
+  el.innerHTML = m.events.map(e => {
+    const s = new Date(e.start);
+    const day = s.toDateString() === new Date().toDateString() ? '' : s.toLocaleDateString(undefined, { weekday: 'short' }) + ' ';
+    const time = s.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const loc = e.location ? `<div class="meta">📍 ${escHtml(e.location)}</div>` : '';
+    return `<div class="card"><div class="content"><strong>${day}${time}</strong> — ${escHtml(e.title)}</div>${loc}</div>`;
+  }).join('');
+}
+function renderBriefState(rows) {
+  const el = document.getElementById('brief-state');
+  const s = Array.isArray(rows) && rows.length ? rows[0] : null;
+  if (!s || !s.content) { el.innerHTML = '<p style="color:#555;font-size:0.9rem">No state saved yet — ask Claude to update your state with current projects</p>'; return; }
+  el.innerHTML = `<div class="card"><div class="content">${escHtml(s.content)}</div><div class="meta">Last updated ${new Date(s.created_at).toLocaleString()}</div></div>`;
 }
 function toast(msg, isError = false) {
   const t = document.getElementById('toast');
@@ -302,6 +349,7 @@ async function loadRecent() {
   renderCards(items, document.getElementById('recent-list'));
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+loadBrief();
 </script>
 </body>
 </html>
