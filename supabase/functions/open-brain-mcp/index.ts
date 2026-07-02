@@ -27,23 +27,23 @@ const HEADERS = {
 const TOOLS = [
   {
     name: "search_brain",
-    description: "Semantic search across all saved thoughts, notes, contacts, projects, and transcripts. Finds by meaning, not just keywords. Optionally filter by type: thought, contact, project, state, session.",
-    inputSchema: { type: "object", properties: { query: { type: "string" }, type: { type: "string" }, limit: { type: "number" } }, required: ["query"] },
+    description: "Semantic search across all saved thoughts, notes, contacts, projects, and transcripts. Finds by meaning, not just keywords. Optionally filter by type: thought, contact, project, state, session. Optionally filter by bucket (life compartment): gcu, legacy, school, personal.",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, type: { type: "string" }, bucket: { type: "string" }, limit: { type: "number" } }, required: ["query"] },
   },
   {
     name: "search_thoughts",
     description: "Alias of search_brain. Semantic search across saved thoughts, notes, transcripts, and PDFs.",
-    inputSchema: { type: "object", properties: { query: { type: "string" }, type: { type: "string" }, limit: { type: "number" } }, required: ["query"] },
+    inputSchema: { type: "object", properties: { query: { type: "string" }, type: { type: "string" }, bucket: { type: "string" }, limit: { type: "number" } }, required: ["query"] },
   },
   {
     name: "list_recent",
-    description: "Get the most recently saved entries, optionally filtered by type (thought, contact, project, session, digest).",
-    inputSchema: { type: "object", properties: { limit: { type: "number" }, type: { type: "string" } } },
+    description: "Get the most recently saved entries, optionally filtered by type (thought, contact, project, session, digest) and/or bucket (gcu, legacy, school, personal).",
+    inputSchema: { type: "object", properties: { limit: { type: "number" }, type: { type: "string" }, bucket: { type: "string" } } },
   },
   {
     name: "add_thought",
-    description: "Save a new entry to the brain. Optionally set a type (thought, contact, project) and a short title.",
-    inputSchema: { type: "object", properties: { content: { type: "string" }, type: { type: "string" }, title: { type: "string" } }, required: ["content"] },
+    description: "Save a new entry to the brain. Optionally set a type (thought, contact, project), a short title, and a bucket — the life compartment it belongs to: gcu (GCU Development job), legacy (Legacy Development Partners job), school, or personal.",
+    inputSchema: { type: "object", properties: { content: { type: "string" }, type: { type: "string" }, title: { type: "string" }, bucket: { type: "string" } }, required: ["content"] },
   },
   {
     name: "get_contact",
@@ -117,43 +117,47 @@ function preview(rows: any[]) {
   });
 }
 
+const COLS = "id,content,title,type,tags,category,summary,bucket,created_at";
+
 async function getThought(id: string) {
   const res = await fetch(
-    SUPABASE_URL + "/rest/v1/thoughts?select=id,content,title,type,tags,category,summary,created_at&id=eq." + encodeURIComponent(id) + "&limit=1",
+    SUPABASE_URL + "/rest/v1/thoughts?select=" + COLS + "&id=eq." + encodeURIComponent(id) + "&limit=1",
     { headers: HEADERS }
   );
   return await res.json();
 }
 
-async function searchBrain(query: string, type?: string, limit?: number) {
+async function searchBrain(query: string, type?: string, limit?: number, bucket?: string) {
   const emb = await embed(query);
   if (emb) {
     const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/match_thoughts", {
       method: "POST",
       headers: HEADERS,
-      body: JSON.stringify({ query_embedding: emb, match_count: limit || 10, filter_type: type || null }),
+      body: JSON.stringify({ query_embedding: emb, match_count: limit || 10, filter_type: type || null, filter_bucket: bucket || null }),
     });
     const rows = await res.json();
     if (Array.isArray(rows) && rows.length) return rows;
   }
-  let url = SUPABASE_URL + "/rest/v1/thoughts?select=id,content,title,type,tags,category,summary,created_at&content=ilike.*" + encodeURIComponent(query) + "*&order=created_at.desc&limit=" + (limit || 10);
+  let url = SUPABASE_URL + "/rest/v1/thoughts?select=" + COLS + "&content=ilike.*" + encodeURIComponent(query) + "*&order=created_at.desc&limit=" + (limit || 10);
   if (type) url += "&type=eq." + encodeURIComponent(type);
+  if (bucket) url += "&bucket=eq." + encodeURIComponent(bucket);
   const res = await fetch(url, { headers: HEADERS });
   return await res.json();
 }
 
-async function listRecent(limit?: number, type?: string) {
-  let url = SUPABASE_URL + "/rest/v1/thoughts?select=id,content,title,type,tags,category,summary,created_at&order=created_at.desc&limit=" + (limit || 10);
+async function listRecent(limit?: number, type?: string, bucket?: string) {
+  let url = SUPABASE_URL + "/rest/v1/thoughts?select=" + COLS + "&order=created_at.desc&limit=" + (limit || 10);
   if (type) url += "&type=eq." + encodeURIComponent(type);
+  if (bucket) url += "&bucket=eq." + encodeURIComponent(bucket);
   const res = await fetch(url, { headers: HEADERS });
   return await res.json();
 }
 
-async function addEntry(content: string, type?: string, title?: string) {
+async function addEntry(content: string, type?: string, title?: string, bucket?: string) {
   const res = await fetch(SUPABASE_URL + "/rest/v1/thoughts", {
     method: "POST",
     headers: { ...HEADERS, Prefer: "return=representation" },
-    body: JSON.stringify({ content, type: type || "thought", title: title || null }),
+    body: JSON.stringify({ content, type: type || "thought", title: title || null, bucket: bucket || null }),
   });
   const rows = await res.json();
   return strip(Array.isArray(rows) ? rows : [rows]);
@@ -161,7 +165,7 @@ async function addEntry(content: string, type?: string, title?: string) {
 
 async function getByTitle(type: string, title: string) {
   const res = await fetch(
-    SUPABASE_URL + "/rest/v1/thoughts?select=id,content,title,type,tags,category,summary,created_at&type=eq." + type + "&title=ilike.*" + encodeURIComponent(title) + "*&order=created_at.desc&limit=5",
+    SUPABASE_URL + "/rest/v1/thoughts?select=" + COLS + "&type=eq." + type + "&title=ilike.*" + encodeURIComponent(title) + "*&order=created_at.desc&limit=5",
     { headers: HEADERS }
   );
   return await res.json();
@@ -247,10 +251,10 @@ Deno.serve(async (req) => {
     const args = params?.arguments || {};
     const text = (obj: unknown) => ({ content: [{ type: "text", text: typeof obj === "string" ? obj : JSON.stringify(obj, null, 2) }] });
 
-    if (name === "search_brain" || name === "search_thoughts") result = text(preview(await searchBrain(args.query || "", args.type, args.limit)));
-    else if (name === "list_recent") result = text(preview(await listRecent(args.limit, args.type)));
+    if (name === "search_brain" || name === "search_thoughts") result = text(preview(await searchBrain(args.query || "", args.type, args.limit, args.bucket)));
+    else if (name === "list_recent") result = text(preview(await listRecent(args.limit, args.type, args.bucket)));
     else if (name === "get_thought") result = text(strip(await getThought(args.id || "")));
-    else if (name === "add_thought") result = text({ saved: await addEntry(args.content || "", args.type, args.title) });
+    else if (name === "add_thought") result = text({ saved: await addEntry(args.content || "", args.type, args.title, args.bucket) });
     else if (name === "get_contact") result = text(strip(await getByTitle("contact", args.name || "")));
     else if (name === "update_contact") result = text(await upsertByTitle("contact", args.name || "", args.content || ""));
     else if (name === "get_state") result = text(strip(await getByTitle("state", "current")));

@@ -44,6 +44,22 @@
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #000; padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
     .toast.error { background: #ef4444; color: #fff; }
     .toast.show { opacity: 1; }
+    .bucket-bar { display: none; gap: 6px; padding: 14px 24px 0; flex-wrap: wrap; align-items: center; }
+    .bucket-bar.visible { display: flex; }
+    .bucket-bar .bucket-label { font-size: 0.75rem; color: #555; margin-right: 2px; }
+    .chip { background: #1a1a1a; border: 1px solid #2a2a2a; color: #888; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 0.78rem; transition: all 0.15s; }
+    .chip:hover:not(.active) { color: #ddd; background: #222; }
+    .chip.active { color: #fff; border-color: transparent; }
+    .chip.b-gcu.active { background: #7c3aed; }
+    .chip.b-legacy.active { background: #d97706; }
+    .chip.b-school.active { background: #2563eb; }
+    .chip.b-personal.active { background: #16a34a; }
+    .chip.b-all.active { background: #6366f1; }
+    .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 600; margin-right: 6px; }
+    .badge.b-gcu { background: rgba(124,58,237,.18); color: #a78bfa; }
+    .badge.b-legacy { background: rgba(217,119,6,.18); color: #fbbf24; }
+    .badge.b-school { background: rgba(37,99,235,.18); color: #93c5fd; }
+    .badge.b-personal { background: rgba(22,163,74,.18); color: #86efac; }
     .yt-preview { display: flex; gap: 12px; align-items: center; background: #1a1a1a; border-radius: 8px; padding: 10px; margin: 10px 0; }
     .yt-preview img { width: 80px; height: 45px; border-radius: 4px; object-fit: cover; }
     .yt-preview .yt-title { font-size: 0.85rem; color: #d4d4d4; }
@@ -66,6 +82,13 @@
   <button onclick="showTab('search')">🔍 Search</button>
   <button onclick="showTab('recent')">🕐 Recent</button>
 </nav>
+<div class="bucket-bar" id="bucket-bar">
+  <span class="bucket-label">Save to:</span>
+  <button class="chip b-gcu" onclick="setBucket('gcu')">🏛️ GCU</button>
+  <button class="chip b-legacy" onclick="setBucket('legacy')">🏗️ Legacy</button>
+  <button class="chip b-school" onclick="setBucket('school')">📚 School</button>
+  <button class="chip b-personal" onclick="setBucket('personal')">🏠 Personal</button>
+</div>
 <div class="tab active" id="tab-brief">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
     <p style="color:#555;font-size:0.8rem" id="brief-date"></p>
@@ -138,6 +161,13 @@
   <div id="search-results"><p class="empty">Type something and press Search</p></div>
 </div>
 <div class="tab" id="tab-recent">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" id="recent-filters">
+    <button class="chip b-all active" onclick="filterRecent('')">All</button>
+    <button class="chip b-gcu" onclick="filterRecent('gcu')">🏛️ GCU</button>
+    <button class="chip b-legacy" onclick="filterRecent('legacy')">🏗️ Legacy</button>
+    <button class="chip b-school" onclick="filterRecent('school')">📚 School</button>
+    <button class="chip b-personal" onclick="filterRecent('personal')">🏠 Personal</button>
+  </div>
   <p style="color:#555;font-size:0.8rem;margin-bottom:14px">Last 20 captures</p>
   <div id="recent-list"><p style="color:#555">Loading...</p></div>
 </div>
@@ -165,18 +195,35 @@ async function mcp(tool, args) {
   const data = await r.json();
   try { return JSON.parse(data.result.content[0].text); } catch { return null; }
 }
+const BUCKETS = { gcu: '🏛️ GCU', legacy: '🏗️ Legacy', school: '📚 School', personal: '🏠 Personal' };
+const CAPTURE_TABS = ['note', 'voice', 'youtube', 'pdf', 'url'];
+let bucket = localStorage.getItem('brain_bucket') || 'personal';
+function setBucket(b) {
+  bucket = b;
+  localStorage.setItem('brain_bucket', b);
+  document.querySelectorAll('#bucket-bar .chip').forEach(c => c.classList.toggle('active', c.classList.contains('b-' + b)));
+}
+let recentBucket = '';
+function filterRecent(b) {
+  recentBucket = b;
+  document.querySelectorAll('#recent-filters .chip').forEach(c => c.classList.toggle('active', b === '' ? c.classList.contains('b-all') : c.classList.contains('b-' + b)));
+  loadRecent();
+}
 const db = {
   async insert(content) {
-    const res = await mcp('add_thought', { content });
+    const res = await mcp('add_thought', { content, bucket });
     return !!(res && res.saved);
   },
   async recent() {
-    return (await mcp('list_recent', { limit: 20 })) || [];
+    const args = { limit: 20 };
+    if (recentBucket) args.bucket = recentBucket;
+    return (await mcp('list_recent', args)) || [];
   },
   async search(q) {
     return (await mcp('search_brain', { query: q, limit: 30 })) || [];
   }
 };
+setBucket(bucket);
 (async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/open-brain-mcp`, {
@@ -192,6 +239,7 @@ function showTab(name) {
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   event.target.classList.add('active');
+  document.getElementById('bucket-bar').classList.toggle('visible', CAPTURE_TABS.includes(name));
   if (name === 'recent') loadRecent();
   if (name === 'brief') loadBrief();
 }
@@ -244,7 +292,10 @@ function toast(msg, isError = false) {
 }
 function renderCards(items, container) {
   if (!items.length) { container.innerHTML = '<p style="color:#555;font-size:0.9rem;padding:20px 0">Nothing found</p>'; return; }
-  container.innerHTML = items.map(i => `<div class="card"><div class="content">${escHtml(i.content.slice(0,600))}${i.content.length>600?'…':''}</div><div class="meta">${new Date(i.created_at).toLocaleString()}</div></div>`).join('');
+  container.innerHTML = items.map(i => {
+    const badge = i.bucket && BUCKETS[i.bucket] ? `<span class="badge b-${i.bucket}">${BUCKETS[i.bucket]}</span>` : '';
+    return `<div class="card"><div class="content">${escHtml(i.content.slice(0,600))}${i.content.length>600?'…':''}</div><div class="meta">${badge}${new Date(i.created_at).toLocaleString()}</div></div>`;
+  }).join('');
 }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 async function saveNote() {
