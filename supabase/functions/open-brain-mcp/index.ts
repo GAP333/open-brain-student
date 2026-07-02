@@ -71,6 +71,11 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { content: { type: "string" }, title: { type: "string" } }, required: ["content"] },
   },
   {
+    name: "get_thought",
+    description: "Get the FULL content of one entry by its id. Use after search_brain when a truncated result needs to be read in full.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+  },
+  {
     name: "get_upcoming_meetings",
     description: "Get upcoming meetings from the connected Outlook (GCU) calendar. Optionally set days ahead to look (default 7).",
     inputSchema: { type: "object", properties: { days: { type: "number" } } },
@@ -94,6 +99,30 @@ async function embed(text: string): Promise<number[] | null> {
 function strip(rows: any[]) {
   if (!Array.isArray(rows)) return rows;
   return rows.map(({ embedding, ...rest }) => rest);
+}
+
+const PREVIEW_CHARS = 1500;
+function preview(rows: any[]) {
+  if (!Array.isArray(rows)) return rows;
+  return rows.map(({ embedding, content, ...rest }) => {
+    const full = content ?? "";
+    if (full.length <= PREVIEW_CHARS) return { ...rest, content: full };
+    return {
+      ...rest,
+      content: full.slice(0, PREVIEW_CHARS),
+      truncated: true,
+      full_length: full.length,
+      note: "Truncated. Call get_thought with this id for the full content.",
+    };
+  });
+}
+
+async function getThought(id: string) {
+  const res = await fetch(
+    SUPABASE_URL + "/rest/v1/thoughts?select=id,content,title,type,tags,category,summary,created_at&id=eq." + encodeURIComponent(id) + "&limit=1",
+    { headers: HEADERS }
+  );
+  return await res.json();
 }
 
 async function searchBrain(query: string, type?: string, limit?: number) {
@@ -218,8 +247,9 @@ Deno.serve(async (req) => {
     const args = params?.arguments || {};
     const text = (obj: unknown) => ({ content: [{ type: "text", text: typeof obj === "string" ? obj : JSON.stringify(obj, null, 2) }] });
 
-    if (name === "search_brain" || name === "search_thoughts") result = text(strip(await searchBrain(args.query || "", args.type, args.limit)));
-    else if (name === "list_recent") result = text(strip(await listRecent(args.limit, args.type)));
+    if (name === "search_brain" || name === "search_thoughts") result = text(preview(await searchBrain(args.query || "", args.type, args.limit)));
+    else if (name === "list_recent") result = text(preview(await listRecent(args.limit, args.type)));
+    else if (name === "get_thought") result = text(strip(await getThought(args.id || "")));
     else if (name === "add_thought") result = text({ saved: await addEntry(args.content || "", args.type, args.title) });
     else if (name === "get_contact") result = text(strip(await getByTitle("contact", args.name || "")));
     else if (name === "update_contact") result = text(await upsertByTitle("contact", args.name || "", args.content || ""));
@@ -229,7 +259,7 @@ Deno.serve(async (req) => {
     else if (name === "get_upcoming_meetings") result = text(await getUpcomingMeetings(args.days));
     else result = text("Unknown tool: " + name);
   } else if (method === "initialize") {
-    result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "open-brain", version: "3.0.0" } };
+    result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "open-brain", version: "3.1.0" } };
   } else {
     result = { error: "Unknown method: " + method };
   }
