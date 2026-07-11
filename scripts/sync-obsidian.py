@@ -222,7 +222,7 @@ def main():
     hub_page(KIC, "👑", "GCU",
              "Kingdom Impact Council — everything you do for KIC collects here. "
              "Mention \"KIC\" or \"Kingdom Impact Council\" in a capture and it links here automatically.")
-    hub_page(IDEAS, "🧿", None,
+    hub_page(IDEAS, "💡", None,
              "Every idea captured through the /idea pipeline — source, interpretation, "
              "build plan, and status (PENDING APPROVAL / EXECUTED / KILLED). "
              "Live dashboard: https://open-brain-student.vercel.app/pipeline.html")
