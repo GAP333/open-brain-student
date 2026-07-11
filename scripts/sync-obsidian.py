@@ -37,8 +37,9 @@ HUB_BY_BUCKET = {"gcu": "GCU", "legacy": "Legacy", "school": "School", "personal
 KIC = "Kingdom Impact Council"
 KIC_RE = re.compile(r"kingdom impact|\bkic\b", re.IGNORECASE)
 UNSORTED = "Unsorted"
-GENERATED_DIRS = list(BUCKET_FOLDERS.values()) + [UNSORTED, "Tasks", "Recaps", "Contacts", KIC]
-HUB_FILES = ["Work.md", "GCU.md", "Legacy.md", "School.md", "Personal.md", f"{KIC}.md"]
+IDEAS = "Idea Pipeline"
+GENERATED_DIRS = list(BUCKET_FOLDERS.values()) + [UNSORTED, "Tasks", "Recaps", "Contacts", KIC, "Ideas"]
+HUB_FILES = ["Work.md", "GCU.md", "Legacy.md", "School.md", "Personal.md", f"{KIC}.md", f"{IDEAS}.md"]
 
 
 def get_token() -> str:
@@ -115,7 +116,7 @@ def main():
     contacts = [r for r in rows if (r.get("type") or "") == "contact"]
     contact_names = [c.get("title") for c in contacts if c.get("title")]
 
-    hub_members = {h: [] for h in ["Work", "GCU", "Legacy", "School", "Personal", KIC]}
+    hub_members = {h: [] for h in ["Work", "GCU", "Legacy", "School", "Personal", KIC, IDEAS]}
     tasks, state_row, written = [], None, 0
     for r in rows:
         t = r.get("type") or "thought"
@@ -131,6 +132,9 @@ def main():
             folder, fname = VAULT / "Recaps", f"{created} {slug(r.get('title') or 'Recap')}.md"
         elif t == "contact":
             folder, fname = VAULT / "Contacts", f"{slug(r.get('title') or 'Contact')}.md"
+        elif t == "idea":
+            folder = VAULT / "Ideas"
+            fname = f"{created} {slug(r.get('title') or content)} {str(r.get('id'))[:6]}.md"
         else:
             folder = VAULT / BUCKET_FOLDERS.get(r.get("bucket"), UNSORTED)
             fname = f"{created} {slug(r.get('title') or content)} {str(r.get('id'))[:6]}.md"
@@ -149,6 +153,8 @@ def main():
             hubs.append(HUB_BY_BUCKET[r["bucket"]])
         if KIC_RE.search(content) or KIC_RE.search(r.get("title") or ""):
             hubs.append(KIC)
+        if t == "idea":
+            hubs.append(IDEAS)
         if hubs:
             body += "\n\nPart of: " + " ".join(f"[[{h}]]" for h in hubs)
             for h in hubs:
@@ -216,6 +222,10 @@ def main():
     hub_page(KIC, "👑", "GCU",
              "Kingdom Impact Council — everything you do for KIC collects here. "
              "Mention \"KIC\" or \"Kingdom Impact Council\" in a capture and it links here automatically.")
+    hub_page(IDEAS, "🧿", None,
+             "Every idea captured through the /idea pipeline — source, interpretation, "
+             "build plan, and status (PENDING APPROVAL / EXECUTED / KILLED). "
+             "Live dashboard: https://open-brain-student.vercel.app/pipeline.html")
 
     if state_row and state_row.get("content"):
         (VAULT / "Current Focus.md").write_text(
@@ -232,7 +242,7 @@ def main():
         "",
         "- [[Current Focus]]",
         "- [[Work]] → [[GCU]] (with [[Kingdom Impact Council]]) and [[Legacy]]",
-        "- [[School]] · [[Personal]]",
+        "- [[School]] · [[Personal]] · [[Idea Pipeline]]",
         f"- **Tasks** — {open_count} open (see the Tasks folder)",
         "- Recaps — one note per daily recap",
         "",

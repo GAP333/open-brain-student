@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Idea Pipeline</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #04080d; --panel: #071019; --line: #0e2233; --line2: #123449;
+    --cyan: #35e0f2; --cyan-dim: #1b7d8c; --txt: #b8d4dd; --txt-dim: #4f7280;
+    --green: #2ee06a; --orange: #f5a623; --red: #f25555; --violet: #a78bfa;
+  }
+  body { background: var(--bg); color: var(--txt); font-family: ui-monospace, "SF Mono", Menlo, monospace; min-height: 100vh;
+         background-image: linear-gradient(rgba(53,224,242,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(53,224,242,.03) 1px, transparent 1px);
+         background-size: 44px 44px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 22px 18px 60px; }
+  .masthead { border-left: 3px solid var(--cyan); padding: 4px 0 4px 16px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  h1 { color: var(--cyan); font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: .35em; font-weight: 700; text-shadow: 0 0 18px rgba(53,224,242,.45); }
+  .sub { color: var(--txt-dim); font-size: .68rem; letter-spacing: .28em; margin-top: 6px; text-transform: uppercase; }
+  .backlink { color: var(--txt-dim); font-size: .7rem; text-decoration: none; letter-spacing: .12em; border: 1px solid var(--line2); padding: 6px 10px; }
+  .backlink:hover { color: var(--cyan); border-color: var(--cyan-dim); }
+  .statusline { display: flex; gap: 18px; align-items: center; font-size: .66rem; color: var(--txt-dim); letter-spacing: .18em; padding: 10px 0 20px 19px; text-transform: uppercase; flex-wrap: wrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); display: inline-block; margin-right: 6px; }
+  .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  #sphere { position: fixed; right: -60px; top: -40px; opacity: .35; pointer-events: none; z-index: 0; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; position: relative; z-index: 1; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+  .stage { border: 1px solid var(--line); background: linear-gradient(160deg, rgba(53,224,242,.05), rgba(4,8,13,.2)); padding: 14px 14px 12px; position: relative; min-height: 158px; }
+  .stage::before, .stage::after { content: ""; position: absolute; width: 10px; height: 10px; border: 1px solid var(--cyan); }
+  .stage::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .stage::after  { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+  .stage h2 { color: var(--cyan); font-size: .78rem; letter-spacing: .22em; font-weight: 700; }
+  .stage .num { position: absolute; top: 8px; right: 12px; font-size: 1.5rem; color: rgba(53,224,242,.16); font-weight: 700; }
+  .stage p { font-size: .66rem; line-height: 1.65; color: var(--txt-dim); margin: 9px 0 10px; }
+  .chip { display: inline-block; font-size: .58rem; letter-spacing: .2em; padding: 2px 9px; border: 1px solid; }
+  .chip.live { color: var(--green); border-color: var(--green); box-shadow: 0 0 8px rgba(46,224,106,.25); }
+  .chip.planned { color: var(--orange); border-color: var(--orange); }
+  .stage .count { font-size: .6rem; color: var(--txt-dim); margin-top: 8px; letter-spacing: .12em; }
+  .ledger { margin-top: 30px; border: 1px solid var(--line); background: rgba(7,16,25,.7); position: relative; z-index: 1; }
+  .ledger-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 8px; }
+  .ledger-head h3 { color: var(--cyan); font-size: .74rem; letter-spacing: .3em; }
+  .ledger-head h3::before { content: "◍ "; }
+  .refresh { background: none; border: 1px solid var(--line2); color: var(--txt-dim); font: inherit; font-size: .62rem; letter-spacing: .18em; padding: 5px 12px; cursor: pointer; }
+  .refresh:hover { color: var(--cyan); border-color: var(--cyan-dim); }
+  .row { padding: 11px 16px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .row:hover { background: rgba(53,224,242,.05); }
+  .row .idx { color: var(--cyan-dim); font-size: .62rem; }
+  .row .title { color: var(--txt); font-size: .76rem; flex: 1; min-width: 180px; }
+  .row .date { color: var(--txt-dim); font-size: .6rem; letter-spacing: .1em; }
+  .st { font-size: .56rem; letter-spacing: .16em; padding: 2px 8px; border: 1px solid; }
+  .st.pending  { color: var(--orange); border-color: var(--orange); }
+  .st.executed { color: var(--green); border-color: var(--green); }
+  .st.killed   { color: var(--red); border-color: var(--red); }
+  .st.idea     { color: var(--cyan); border-color: var(--cyan-dim); }
+  .bk { font-size: .56rem; letter-spacing: .14em; padding: 2px 8px; }
+  .bk.gcu { color: var(--violet); border: 1px solid var(--violet); }
+  .bk.legacy { color: var(--orange); border: 1px solid var(--orange); }
+  .bk.school { color: #7db4ff; border: 1px solid #7db4ff; }
+  .bk.personal { color: var(--green); border: 1px solid var(--green); }
+  .detail { display: none; padding: 16px 20px 20px; background: rgba(4,8,13,.6); border-bottom: 1px solid var(--line); }
+  .detail.open { display: block; }
+  .detail pre { white-space: pre-wrap; word-break: break-word; font: inherit; font-size: .72rem; line-height: 1.75; color: var(--txt); }
+  .detail .sect { color: var(--cyan); letter-spacing: .2em; font-size: .62rem; margin: 14px 0 4px; }
+  .detail a { color: var(--cyan); }
+  .empty { padding: 26px 16px; color: var(--txt-dim); font-size: .7rem; letter-spacing: .12em; }
+  .foot { margin-top: 26px; color: var(--txt-dim); font-size: .6rem; letter-spacing: .18em; text-align: right; text-transform: uppercase; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<canvas id="sphere" width="360" height="360"></canvas>
+<div class="wrap">
+  <div class="masthead">
+    <div>
+      <h1>IDEA PIPELINE</h1>
+      <div class="sub">Capture — Interpretation — Approval — Execution · Grace's Brain</div>
+    </div>
+    <a class="backlink" href="index.html">← BRAIN</a>
+  </div>
+  <div class="statusline">
+    <span><span class="dot" id="dot"></span><span id="conn">LINKING…</span></span>
+    <span id="clock"></span>
+    <span id="tally">— IDEAS</span>
+  </div>
+
+  <div class="grid" id="stages"></div>
+
+  <div class="ledger">
+    <div class="ledger-head">
+      <h3>IDEA LEDGER</h3>
+      <button class="refresh" onclick="load(true)">↻ REFRESH</button>
+    </div>
+    <div id="ledger-body"><div class="empty">LOADING…</div></div>
+  </div>
+  <div class="foot">OPEN BRAIN · IDEA PIPELINE v1 · MIRRORED TO OBSIDIAN VAULT</div>
+</div>
+<script src="config.js"></script>
+<script>
+const STAGES = [
+  ["CAPTURE",  "Send Claude any idea — video, reel, link, screenshot, or a thought. Messages attachments get pulled out automatically.", "live"],
+  ["EXTRACT",  "Frames pulled from video on-device; transcripts via TurboScribe paste; pages fetched and read.", "live"],
+  ["INTERPRET","Claude reads the content: thesis, claims worth verifying, and the actionable idea for Grace's stack.", "live"],
+  ["ORGANIZE", "Filed into Open Brain as a typed idea with bucket — mirrored into the Obsidian vault graph.", "live"],
+  ["PLAN",     "A build plan drafted per idea — steps, tools, effort, expected value — stored in the entry.", "live"],
+  ["APPROVE",  "The human gate. An approval task lands in the daily digest. Nothing executes without Grace's sign-off.", "live"],
+  ["EXECUTE",  "Approved ideas get built by Claude and verified before they're reported done.", "live"],
+  ["TRACK",    "Outcomes written back to the Brain with a verdict — the ledger below is the live loop.", "live"],
+];
+function getKey() {
+  let k = localStorage.getItem('brain_key');
+  if (!k) { k = prompt('Enter your brain access key:') || ''; if (k) localStorage.setItem('brain_key', k.trim()); }
+  return (k || '').trim();
+}
+async function mcp(tool, args) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/open-brain-mcp`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getKey()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method: 'tools/call', id: 1, params: { name: tool, arguments: args || {} } })
+  });
+  if (!r.ok) return null;
+  const d = await r.json();
+  try { return JSON.parse(d.result.content[0].text); } catch { return null; }
+}
+function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function linkify(s) { return s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
+function statusOf(c) {
+  const m = (c || '').match(/STATUS:\s*([A-Z ]+)/i);
+  const s = m ? m[1].trim().toUpperCase() : '';
+  if (s.startsWith('EXEC')) return 'executed';
+  if (s.startsWith('KILL')) return 'killed';
+  if (s.startsWith('PEND')) return 'pending';
+  return 'idea';
+}
+function renderStages(counts) {
+  document.getElementById('stages').innerHTML = STAGES.map((s, i) => `
+    <div class="stage"><span class="num">0${i+1}</span><h2>${s[0]}</h2><p>${s[1]}</p>
+      <span class="chip ${s[2]}">${s[2] === 'live' ? 'LIVE' : 'PLANNED'}</span>
+      <div class="count">${counts[i] !== null ? '▸ ' + counts[i] + ' ideas' : ''}</div>
+    </div>`).join('');
+}
+function sections(content) {
+  // split on SOURCE:/SUMMARY:/TRANSCRIPT:/INTERPRETATION:/PLAN:/STATUS: headings for pretty display
+  const parts = content.split(/\n(?=(?:SOURCE|SUMMARY|TRANSCRIPT|INTERPRETATION(?: FOR GRACE)?|PLAN|STATUS)\s*:)/g);
+  return parts.map(p => {
+    const m = p.match(/^([A-Z ]+):\s*([\s\S]*)$/);
+    if (m) return `<div class="sect">▸ ${esc(m[1].trim())}</div><pre>${linkify(esc(m[2].trim()))}</pre>`;
+    return `<pre>${linkify(esc(p.trim()))}</pre>`;
+  }).join('');
+}
+let ideas = [];
+function renderLedger() {
+  const el = document.getElementById('ledger-body');
+  if (!ideas.length) { el.innerHTML = '<div class="empty">NO IDEAS CAPTURED YET — SEND CLAUDE ONE WITH /idea</div>'; return; }
+  el.innerHTML = ideas.map((it, i) => {
+    const st = statusOf(it.content);
+    const b = it.bucket || 'personal';
+    const d = new Date(it.created_at);
+    return `<div class="row" onclick="toggle(${i})">
+        <span class="idx">${String(i+1).padStart(2,'0')}</span>
+        <span class="title">${esc(it.title || (it.content || '').slice(0, 70))}</span>
+        <span class="bk ${b}">${b.toUpperCase()}</span>
+        <span class="st ${st}">${st.toUpperCase()}</span>
+        <span class="date">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span>
+      </div><div class="detail" id="d${i}">${sections(it.content || '')}</div>`;
+  }).join('');
+}
+function toggle(i) { document.getElementById('d' + i).classList.toggle('open'); }
+async function load(interactive) {
+  if (!localStorage.getItem('brain_key') && !interactive) {
+    document.getElementById('conn').textContent = 'NO KEY — TAP REFRESH TO LINK';
+    document.getElementById('ledger-body').innerHTML = '<div class="empty">TAP ↻ REFRESH AND ENTER YOUR BRAIN KEY</div>';
+    return;
+  }
+  document.getElementById('ledger-body').innerHTML = '<div class="empty">LOADING…</div>';
+  const res = await mcp('list_recent', { type: 'idea', limit: 50 });
+  const ok = Array.isArray(res);
+  document.getElementById('dot').classList.toggle('on', ok);
+  document.getElementById('conn').textContent = ok ? 'BRAIN LINK LIVE' : 'LINK DOWN';
+  ideas = ok ? res : [];
+  const pend = ideas.filter(i => statusOf(i.content) === 'pending').length;
+  const done = ideas.filter(i => statusOf(i.content) === 'executed').length;
+  document.getElementById('tally').textContent = `${ideas.length} IDEAS · ${pend} AWAITING APPROVAL · ${done} EXECUTED`;
+  renderStages([ideas.length, null, null, ideas.length, null, pend, done, done]);
+  renderLedger();
+}
+function tick() {
+  const n = new Date();
+  document.getElementById('clock').textContent = n.toLocaleTimeString([], {hour12:false});
+}
+setInterval(tick, 1000); tick();
+renderStages([null,null,null,null,null,null,null,null]);
+load();
+// decorative rotating point-sphere
+(() => {
+  const c = document.getElementById('sphere'), x = c.getContext('2d');
+  const pts = [];
+  for (let i = 0; i < 220; i++) {
+    const t = Math.acos(1 - 2 * (i + .5) / 220), p = Math.PI * (1 + Math.sqrt(5)) * i;
+    pts.push([Math.sin(t)*Math.cos(p), Math.sin(t)*Math.sin(p), Math.cos(t)]);
+  }
+  let a = 0;
+  (function draw() {
+    x.clearRect(0, 0, 360, 360); a += .0035;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    for (const [px, py, pz] of pts) {
+      const rx = px*ca - pz*sa, rz = px*sa + pz*ca;
+      const s = 130 / (2.1 - rz);
+      x.fillStyle = `rgba(53,224,242,${.25 + .5 * (rz + 1) / 2})`;
+      x.beginPath(); x.arc(180 + rx*s, 180 + py*s, 1.4, 0, 7); x.fill();
+    }
+    requestAnimationFrame(draw);
+  })();
+})();
+</script>
+</body>
+</html>
