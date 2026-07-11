@@ -121,7 +121,7 @@ function build(entries, tasks) {
     const t = Math.acos(1 - 2 * ((i % 60) + .5) / 60), p = Math.PI * (1 + Math.sqrt(5)) * i;
     nodes.push({
       x: hn.x + Math.sin(t) * Math.cos(p) * .34, y: hn.y + Math.sin(t) * Math.sin(p) * .34, z: hn.z + Math.cos(t) * .34,
-      color: COLORS[e.b] || COLORS.personal, r: e.idea ? 2.6 : 1.7, label: e.label,
+      color: COLORS[e.b] || COLORS.personal, r: e.idea ? 3.6 : 2.6, label: e.label,
       entry: e.entry, isTask: !!e.task, bucket: e.b
     });
     links.push([hi, nodes.length - 1]);
@@ -130,7 +130,7 @@ function build(entries, tasks) {
 let ang = 0, lastProj = [];
 function draw() {
   if (!W || !H || cv.width !== innerWidth * devicePixelRatio) size();
-  cx.clearRect(0, 0, W, H); ang += .0022;
+  cx.clearRect(0, 0, W, H); ang += paused ? 0 : .0011;
   const ca = Math.cos(ang), sa = Math.sin(ang);
   const scale = Math.min(W, H) * .42, cxp = W / 2, cyp = H / 2;
   const proj = lastProj = nodes.map(n => {
@@ -166,7 +166,7 @@ function linkify(s) { return s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" ta
 function closeDetail() { document.getElementById('detail').classList.remove('open'); nodes.forEach(n => n.sel = false); }
 function pick(mx, my) {
   const x = mx * devicePixelRatio, y = my * devicePixelRatio;
-  let best = null, bd = 18 * devicePixelRatio;
+  let best = null, bd = 32 * devicePixelRatio;
   for (const p of lastProj) {
     const d = Math.hypot(p.sx - x, p.sy - y);
     if (d < bd) { bd = d; best = p; }
@@ -195,7 +195,14 @@ cv.addEventListener('click', e => {
   }
   el.classList.add('open');
 });
-cv.addEventListener('mousemove', e => { cv.style.cursor = pick(e.clientX, e.clientY) ? 'pointer' : 'default'; });
+let paused = false;
+cv.addEventListener('mousemove', e => {
+  const hit = pick(e.clientX, e.clientY);
+  cv.style.cursor = hit ? 'pointer' : 'default';
+  paused = !!hit; // freeze rotation while aiming at a node
+});
+cv.addEventListener('touchstart', () => { paused = true; setTimeout(() => paused = false, 2500); }, { passive: true });
+cv.addEventListener('mouseleave', () => paused = false);
 build([], []); draw();
 async function load() {
   const [recent, tasks] = await Promise.all([mcp('list_recent', { limit: 80 }), mcp('list_tasks', {})]);
