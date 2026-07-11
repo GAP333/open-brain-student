@@ -24,6 +24,19 @@
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); display: inline-block; margin-right: 6px; }
   .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
   #sphere { position: fixed; right: -60px; top: -40px; opacity: .35; pointer-events: none; z-index: 0; }
+  .inbound { border: 1px solid var(--line2); background: rgba(7,16,25,.85); padding: 14px 16px 12px; margin-bottom: 20px; position: relative; z-index: 1; box-shadow: 0 0 24px rgba(53,224,242,.06); }
+  .inb-head { color: var(--cyan); font-size: .68rem; letter-spacing: .28em; margin-bottom: 10px; }
+  .inbound textarea { width: 100%; background: #030a10; border: 1px solid var(--line); color: var(--txt); font: inherit; font-size: .74rem; line-height: 1.6; padding: 10px 12px; resize: vertical; outline: none; }
+  .inbound textarea:focus { border-color: var(--cyan-dim); }
+  .inb-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .inb-buckets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .inb-buckets .bk { background: none; cursor: pointer; font: inherit; opacity: .45; }
+  .inb-buckets .bk.sel { opacity: 1; box-shadow: 0 0 10px rgba(53,224,242,.2); }
+  .submit { background: rgba(53,224,242,.08); border: 1px solid var(--cyan); color: var(--cyan); font: inherit; font-size: .66rem; letter-spacing: .2em; padding: 8px 16px; cursor: pointer; }
+  .submit:hover { background: rgba(53,224,242,.18); }
+  .submit:disabled { opacity: .4; cursor: wait; }
+  .inb-note { color: var(--txt-dim); font-size: .58rem; letter-spacing: .08em; margin-top: 9px; }
+  .st.captured { color: var(--violet); border-color: var(--violet); }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; position: relative; z-index: 1; }
   @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
@@ -76,12 +89,30 @@
       <h1>IDEA PIPELINE</h1>
       <div class="sub">Capture — Interpretation — Approval — Execution · Grace's Brain</div>
     </div>
-    <a class="backlink" href="index.html">← BRAIN</a>
+    <div style="display:flex;gap:8px">
+      <a class="backlink" href="digital-brain.html">🌐 DIGITAL BRAIN</a>
+      <a class="backlink" href="index.html">← BRAIN</a>
+    </div>
   </div>
   <div class="statusline">
     <span><span class="dot" id="dot"></span><span id="conn">LINKING…</span></span>
     <span id="clock"></span>
     <span id="tally">— IDEAS</span>
+  </div>
+
+  <div class="inbound">
+    <div class="inb-head">◍ INBOUND — DROP AN IDEA</div>
+    <textarea id="cap-text" rows="3" placeholder="Paste a link, a reel URL, a transcript, or just type the idea…"></textarea>
+    <div class="inb-row">
+      <div class="inb-buckets" id="cap-buckets">
+        <button class="bk gcu" onclick="setCapBucket('gcu')">GCU</button>
+        <button class="bk legacy" onclick="setCapBucket('legacy')">LEGACY</button>
+        <button class="bk school" onclick="setCapBucket('school')">SCHOOL</button>
+        <button class="bk personal" onclick="setCapBucket('personal')">PERSONAL</button>
+      </div>
+      <button class="submit" id="cap-btn" onclick="capture()">▸ SUBMIT TO PIPELINE</button>
+    </div>
+    <div class="inb-note">Captures are picked up automatically (within ~30 min while the Mac is on): interpreted, planned, and queued for your approval.</div>
   </div>
 
   <div class="grid" id="stages"></div>
@@ -130,8 +161,32 @@ function statusOf(c) {
   if (s.startsWith('EXEC')) return 'executed';
   if (s.startsWith('KILL')) return 'killed';
   if (s.startsWith('PEND')) return 'pending';
+  if (s.startsWith('CAPT')) return 'captured';
   return 'idea';
 }
+let capBucket = localStorage.getItem('cap_bucket') || 'personal';
+function setCapBucket(b) {
+  capBucket = b;
+  localStorage.setItem('cap_bucket', b);
+  document.querySelectorAll('#cap-buckets .bk').forEach(x => x.classList.toggle('sel', x.classList.contains(b)));
+}
+async function capture() {
+  const ta = document.getElementById('cap-text');
+  const text = ta.value.trim();
+  if (!text) return;
+  const btn = document.getElementById('cap-btn');
+  btn.disabled = true; btn.textContent = '▸ TRANSMITTING…';
+  const urlMatch = text.match(/https?:\/\/[^\s]+/);
+  const title = 'Capture: ' + (urlMatch ? urlMatch[0].replace(/https?:\/\/(www\.)?/, '').slice(0, 50) : text.slice(0, 50));
+  const content = (urlMatch ? 'SOURCE: ' + urlMatch[0] + '\n\n' : '') +
+    'RAW CAPTURE:\n' + text +
+    '\n\nSTATUS: CAPTURED — awaiting interpretation (submitted from pipeline dashboard ' + new Date().toLocaleString() + ')';
+  const res = await mcp('add_thought', { content, title, type: 'idea', bucket: capBucket });
+  btn.disabled = false; btn.textContent = '▸ SUBMIT TO PIPELINE';
+  if (res && res.saved) { ta.value = ''; load(true); }
+  else alert('Could not save — check your key/connection and try again.');
+}
+setCapBucket(capBucket);
 function renderStages(counts) {
   document.getElementById('stages').innerHTML = STAGES.map((s, i) => `
     <div class="stage"><span class="num">0${i+1}</span><h2>${s[0]}</h2><p>${s[1]}</p>
@@ -180,8 +235,9 @@ async function load(interactive) {
   ideas = ok ? res : [];
   const pend = ideas.filter(i => statusOf(i.content) === 'pending').length;
   const done = ideas.filter(i => statusOf(i.content) === 'executed').length;
-  document.getElementById('tally').textContent = `${ideas.length} IDEAS · ${pend} AWAITING APPROVAL · ${done} EXECUTED`;
-  renderStages([ideas.length, null, null, ideas.length, null, pend, done, done]);
+  const capt = ideas.filter(i => statusOf(i.content) === 'captured').length;
+  document.getElementById('tally').textContent = `${ideas.length} IDEAS · ${capt} CAPTURED · ${pend} AWAITING APPROVAL · ${done} EXECUTED`;
+  renderStages([ideas.length, capt, capt, ideas.length, null, pend, done, done]);
   renderLedger();
 }
 function tick() {

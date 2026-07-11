@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Digital Brain</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #030710; --panel: rgba(6,14,22,.82); --line: #0e2233; --line2: #123449;
+    --cyan: #35e0f2; --cyan-dim: #1b7d8c; --txt: #b8d4dd; --txt-dim: #4f7280;
+    --green: #2ee06a; --orange: #f5a623; --violet: #a78bfa; --blue: #7db4ff;
+  }
+  body { background: var(--bg); color: var(--txt); font-family: ui-monospace, "SF Mono", Menlo, monospace; height: 100vh; overflow: hidden; }
+  #graph { position: fixed; inset: 0; }
+  .hud { position: fixed; z-index: 2; }
+  .brand { top: 14px; left: 18px; color: var(--cyan); letter-spacing: .5em; font-size: .8rem; text-shadow: 0 0 14px rgba(53,224,242,.5); }
+  .brand small { display: block; color: var(--txt-dim); font-size: .56rem; letter-spacing: .3em; margin-top: 5px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); padding: 12px 14px; backdrop-filter: blur(3px); }
+  .panel h4 { color: var(--cyan); font-size: .6rem; letter-spacing: .26em; margin-bottom: 9px; }
+  .panel h4::before { content: "◍ "; }
+  #vitals { top: 64px; left: 18px; width: 215px; }
+  .vital { display: flex; justify-content: space-between; font-size: .62rem; padding: 3px 0; color: var(--txt-dim); }
+  .vital b { color: var(--txt); font-weight: 400; }
+  .bar { height: 3px; background: #0a1a28; margin: 2px 0 7px; }
+  .bar i { display: block; height: 100%; background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+  #telemetry { top: 64px; right: 18px; width: 265px; max-height: 44vh; overflow: hidden; }
+  .tl { font-size: .58rem; color: var(--txt-dim); line-height: 1.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl b { color: var(--cyan); font-weight: 400; }
+  #daily { bottom: 18px; left: 18px; width: 300px; max-height: 40vh; overflow: auto; }
+  .task { font-size: .6rem; color: var(--txt-dim); line-height: 1.55; padding: 4px 0; border-bottom: 1px dotted #0c1c2a; }
+  .task::before { content: "▢ "; color: var(--cyan-dim); }
+  #legendbar { bottom: 18px; right: 18px; display: flex; gap: 10px; font-size: .56rem; letter-spacing: .12em; }
+  .lg { display: flex; align-items: center; gap: 5px; color: var(--txt-dim); }
+  .lg i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .navlinks { top: 14px; right: 18px; display: flex; gap: 8px; }
+  .navlinks a { color: var(--txt-dim); font-size: .62rem; letter-spacing: .16em; text-decoration: none; border: 1px solid var(--line2); padding: 6px 10px; background: var(--panel); }
+  .navlinks a:hover { color: var(--cyan); border-color: var(--cyan-dim); }
+  #conn { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: .6rem; letter-spacing: .22em; color: var(--txt-dim); z-index: 2; }
+  #conn.on { color: var(--green); }
+  @media (max-width: 760px) {
+    #telemetry { display: none; }
+    #vitals { width: 170px; }
+    #daily { width: 230px; max-height: 30vh; }
+  }
+</style>
+</head>
+<body>
+<canvas id="graph"></canvas>
+<div class="hud brand">J.A.R.V.I.S<small>GRACE'S DIGITAL BRAIN</small></div>
+<div id="conn">LINKING…</div>
+<div class="hud navlinks">
+  <a href="pipeline.html">💡 PIPELINE</a>
+  <a href="index.html">🧠 BRAIN</a>
+</div>
+<div class="hud panel" id="vitals"><h4>SYSTEM VITALS</h4><div id="vitals-body">—</div></div>
+<div class="hud panel" id="telemetry"><h4>TELEMETRY</h4><div id="tl-body">—</div></div>
+<div class="hud panel" id="daily"><h4>DAILY TASKS</h4><div id="daily-body">—</div></div>
+<div class="hud" id="legendbar">
+  <span class="lg"><i style="background:#a78bfa"></i>GCU</span>
+  <span class="lg"><i style="background:#f5a623"></i>LEGACY</span>
+  <span class="lg"><i style="background:#7db4ff"></i>SCHOOL</span>
+  <span class="lg"><i style="background:#2ee06a"></i>PERSONAL</span>
+  <span class="lg"><i style="background:#35e0f2"></i>HUB</span>
+</div>
+<script src="config.js"></script>
+<script>
+function getKey() {
+  let k = localStorage.getItem('brain_key');
+  if (!k) { k = prompt('Enter your brain access key:') || ''; if (k) localStorage.setItem('brain_key', k.trim()); }
+  return (k || '').trim();
+}
+async function mcp(tool, args) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/open-brain-mcp`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getKey()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method: 'tools/call', id: 1, params: { name: tool, arguments: args || {} } })
+  });
+  if (!r.ok) return null;
+  const d = await r.json();
+  try { return JSON.parse(d.result.content[0].text); } catch { return null; }
+}
+const COLORS = { gcu: '#a78bfa', legacy: '#f5a623', school: '#7db4ff', personal: '#2ee06a', hub: '#35e0f2' };
+const cv = document.getElementById('graph'), cx = cv.getContext('2d');
+let W, H; function size() {
+  W = cv.width = innerWidth * devicePixelRatio; H = cv.height = innerHeight * devicePixelRatio;
+  cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+}
+size(); addEventListener('resize', size);
+// 3D sphere constellation: hubs anchored, members orbit their hub
+let nodes = [], links = [];
+function build(entries, tasks) {
+  nodes = []; links = [];
+  const hubs = ['gcu', 'legacy', 'school', 'personal'];
+  const hubIdx = {};
+  hubs.forEach((h, i) => {
+    const a = (i / hubs.length) * Math.PI * 2;
+    hubIdx[h] = nodes.length;
+    nodes.push({ x: Math.cos(a) * .55, y: Math.sin(a) * .35, z: Math.sin(a * 2) * .4, hub: true, color: COLORS.hub, label: h.toUpperCase(), r: 4.5 });
+  });
+  const all = entries.map(e => ({ b: e.bucket || 'personal', label: (e.title || e.content || '').slice(0, 26), idea: e.type === 'idea' }))
+    .concat(tasks.map(t => ({ b: t.bucket || 'personal', label: (t.content || '').slice(0, 26), task: true })));
+  all.forEach((e, i) => {
+    const hi = hubIdx[e.b] ?? hubIdx.personal;
+    const hn = nodes[hi];
+    const t = Math.acos(1 - 2 * ((i % 60) + .5) / 60), p = Math.PI * (1 + Math.sqrt(5)) * i;
+    nodes.push({
+      x: hn.x + Math.sin(t) * Math.cos(p) * .34, y: hn.y + Math.sin(t) * Math.sin(p) * .34, z: hn.z + Math.cos(t) * .34,
+      color: COLORS[e.b] || COLORS.personal, r: e.idea ? 2.6 : 1.7, label: e.label
+    });
+    links.push([hi, nodes.length - 1]);
+  });
+}
+let ang = 0;
+function draw() {
+  cx.clearRect(0, 0, W, H); ang += .0022;
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  const scale = Math.min(W, H) * .42, cxp = W / 2, cyp = H / 2;
+  const proj = nodes.map(n => {
+    const rx = n.x * ca - n.z * sa, rz = n.x * sa + n.z * ca;
+    const d = 2.2 - rz;
+    return { sx: cxp + rx * scale / d * 1.6, sy: cyp + n.y * scale / d * 1.6, d, n };
+  });
+  cx.lineWidth = devicePixelRatio * .5;
+  for (const [a, b] of links) {
+    cx.strokeStyle = 'rgba(53,224,242,' + (.12 / Math.max(proj[a].d, proj[b].d) * 2).toFixed(3) + ')';
+    cx.beginPath(); cx.moveTo(proj[a].sx, proj[a].sy); cx.lineTo(proj[b].sx, proj[b].sy); cx.stroke();
+  }
+  for (const p of proj) {
+    const al = .35 + .65 * (2.2 - p.d + 1) / 2;
+    cx.fillStyle = p.n.color; cx.globalAlpha = Math.max(.15, Math.min(1, al));
+    cx.beginPath(); cx.arc(p.sx, p.sy, p.n.r * devicePixelRatio * (1.4 / p.d), 0, 7); cx.fill();
+    if (p.n.hub) {
+      cx.globalAlpha = .9; cx.fillStyle = '#9fd8e2';
+      cx.font = `${10 * devicePixelRatio}px ui-monospace, Menlo`;
+      cx.fillText(p.n.label, p.sx + 8 * devicePixelRatio, p.sy + 3 * devicePixelRatio);
+    }
+  }
+  cx.globalAlpha = 1;
+  requestAnimationFrame(draw);
+}
+build([], []); draw();
+async function load() {
+  const [recent, tasks] = await Promise.all([mcp('list_recent', { limit: 80 }), mcp('list_tasks', {})]);
+  const ok = Array.isArray(recent);
+  const conn = document.getElementById('conn');
+  conn.textContent = ok ? '● BRAIN LINK LIVE' : '● LINK DOWN — RELOAD TO ENTER KEY';
+  conn.classList.toggle('on', ok);
+  const entries = ok ? recent : [];
+  const tk = (tasks && tasks.tasks) ? tasks.tasks : [];
+  build(entries, tk);
+  // vitals
+  const by = {}; entries.forEach(e => { const t = e.type || 'thought'; by[t] = (by[t] || 0) + 1; });
+  const ideas = entries.filter(e => e.type === 'idea');
+  const vb = document.getElementById('vitals-body');
+  const total = entries.length || 1;
+  vb.innerHTML = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([t, c]) =>
+    `<div class="vital"><span>${t.toUpperCase()}</span><b>${c}</b></div><div class="bar"><i style="width:${Math.round(c / total * 100)}%"></i></div>`
+  ).join('') + `<div class="vital"><span>OPEN TASKS</span><b>${tk.length}</b></div><div class="vital"><span>IDEAS IN PIPELINE</span><b>${ideas.length}</b></div>`;
+  // telemetry
+  document.getElementById('tl-body').innerHTML = entries.slice(0, 14).map(e => {
+    const d = new Date(e.created_at);
+    return `<div class="tl"><b>${d.toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'})} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false})}</b> ${(e.type||'thought').toUpperCase()}: ${(e.title || e.content || '').slice(0, 34)}</div>`;
+  }).join('') || '—';
+  // daily tasks
+  document.getElementById('daily-body').innerHTML = tk.slice(0, 12).map(t =>
+    `<div class="task">[${(t.bucket || 'personal').toUpperCase()}] ${(t.content || '').slice(0, 64)}</div>`
+  ).join('') || '<div class="task">No open tasks — all clear</div>';
+}
+if (localStorage.getItem('brain_key')) load(); else document.getElementById('conn').textContent = '● TAP HERE TO LINK', document.getElementById('conn').onclick = load;
+</script>
+</body>
+</html>
