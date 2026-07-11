@@ -38,6 +38,14 @@
   .navlinks a:hover { color: var(--cyan); border-color: var(--cyan-dim); }
   #conn { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: .6rem; letter-spacing: .22em; color: var(--txt-dim); z-index: 2; }
   #conn.on { color: var(--green); }
+  #detail { display: none; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, 92vw); max-height: 72vh; overflow: auto; z-index: 3; box-shadow: 0 0 40px rgba(53,224,242,.15); border-color: var(--cyan-dim); }
+  #detail.open { display: block; }
+  #detail-x { position: absolute; top: 6px; right: 10px; background: none; border: none; color: var(--txt-dim); font: inherit; font-size: 1rem; cursor: pointer; }
+  #detail-x:hover { color: var(--cyan); }
+  #detail-title { color: var(--txt); font-size: .8rem; margin: 2px 0 6px; line-height: 1.5; }
+  #detail-meta { color: var(--txt-dim); font-size: .58rem; letter-spacing: .14em; margin-bottom: 10px; text-transform: uppercase; }
+  #detail-content { color: var(--txt); font-size: .68rem; line-height: 1.75; white-space: pre-wrap; word-break: break-word; border-top: 1px solid var(--line); padding-top: 10px; }
+  #detail-content a { color: var(--cyan); }
   @media (max-width: 760px) {
     #telemetry { display: none; }
     #vitals { width: 170px; }
@@ -56,6 +64,13 @@
 <div class="hud panel" id="vitals"><h4>SYSTEM VITALS</h4><div id="vitals-body">—</div></div>
 <div class="hud panel" id="telemetry"><h4>TELEMETRY</h4><div id="tl-body">—</div></div>
 <div class="hud panel" id="daily"><h4>DAILY TASKS</h4><div id="daily-body">—</div></div>
+<div class="hud panel" id="detail">
+  <button id="detail-x" onclick="closeDetail()">×</button>
+  <h4 id="detail-type">ENTRY</h4>
+  <div id="detail-title"></div>
+  <div id="detail-meta"></div>
+  <div id="detail-content"></div>
+</div>
 <div class="hud" id="legendbar">
   <span class="lg"><i style="background:#a78bfa"></i>GCU</span>
   <span class="lg"><i style="background:#f5a623"></i>LEGACY</span>
@@ -98,25 +113,27 @@ function build(entries, tasks) {
     hubIdx[h] = nodes.length;
     nodes.push({ x: Math.cos(a) * .55, y: Math.sin(a) * .35, z: Math.sin(a * 2) * .4, hub: true, color: COLORS.hub, label: h.toUpperCase(), r: 4.5 });
   });
-  const all = entries.map(e => ({ b: e.bucket || 'personal', label: (e.title || e.content || '').slice(0, 26), idea: e.type === 'idea' }))
-    .concat(tasks.map(t => ({ b: t.bucket || 'personal', label: (t.content || '').slice(0, 26), task: true })));
+  const all = entries.map(e => ({ b: e.bucket || 'personal', label: (e.title || e.content || '').slice(0, 26), idea: e.type === 'idea', entry: e }))
+    .concat(tasks.map(t => ({ b: t.bucket || 'personal', label: (t.content || '').slice(0, 26), task: true, entry: t })));
   all.forEach((e, i) => {
     const hi = hubIdx[e.b] ?? hubIdx.personal;
     const hn = nodes[hi];
     const t = Math.acos(1 - 2 * ((i % 60) + .5) / 60), p = Math.PI * (1 + Math.sqrt(5)) * i;
     nodes.push({
       x: hn.x + Math.sin(t) * Math.cos(p) * .34, y: hn.y + Math.sin(t) * Math.sin(p) * .34, z: hn.z + Math.cos(t) * .34,
-      color: COLORS[e.b] || COLORS.personal, r: e.idea ? 2.6 : 1.7, label: e.label
+      color: COLORS[e.b] || COLORS.personal, r: e.idea ? 2.6 : 1.7, label: e.label,
+      entry: e.entry, isTask: !!e.task, bucket: e.b
     });
     links.push([hi, nodes.length - 1]);
   });
 }
-let ang = 0;
+let ang = 0, lastProj = [];
 function draw() {
+  if (!W || !H || cv.width !== innerWidth * devicePixelRatio) size();
   cx.clearRect(0, 0, W, H); ang += .0022;
   const ca = Math.cos(ang), sa = Math.sin(ang);
   const scale = Math.min(W, H) * .42, cxp = W / 2, cyp = H / 2;
-  const proj = nodes.map(n => {
+  const proj = lastProj = nodes.map(n => {
     const rx = n.x * ca - n.z * sa, rz = n.x * sa + n.z * ca;
     const d = 2.2 - rz;
     return { sx: cxp + rx * scale / d * 1.6, sy: cyp + n.y * scale / d * 1.6, d, n };
@@ -130,6 +147,11 @@ function draw() {
     const al = .35 + .65 * (2.2 - p.d + 1) / 2;
     cx.fillStyle = p.n.color; cx.globalAlpha = Math.max(.15, Math.min(1, al));
     cx.beginPath(); cx.arc(p.sx, p.sy, p.n.r * devicePixelRatio * (1.4 / p.d), 0, 7); cx.fill();
+    if (p.n.sel) {
+      cx.strokeStyle = '#35e0f2'; cx.globalAlpha = .9; cx.lineWidth = devicePixelRatio;
+      cx.beginPath(); cx.arc(p.sx, p.sy, (p.n.r + 5) * devicePixelRatio * (1.4 / p.d), 0, 7); cx.stroke();
+      cx.lineWidth = devicePixelRatio * .5;
+    }
     if (p.n.hub) {
       cx.globalAlpha = .9; cx.fillStyle = '#9fd8e2';
       cx.font = `${10 * devicePixelRatio}px ui-monospace, Menlo`;
@@ -139,6 +161,41 @@ function draw() {
   cx.globalAlpha = 1;
   requestAnimationFrame(draw);
 }
+function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function linkify(s) { return s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
+function closeDetail() { document.getElementById('detail').classList.remove('open'); nodes.forEach(n => n.sel = false); }
+function pick(mx, my) {
+  const x = mx * devicePixelRatio, y = my * devicePixelRatio;
+  let best = null, bd = 18 * devicePixelRatio;
+  for (const p of lastProj) {
+    const d = Math.hypot(p.sx - x, p.sy - y);
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
+cv.addEventListener('click', e => {
+  const p = pick(e.clientX, e.clientY);
+  if (!p) { closeDetail(); return; }
+  nodes.forEach(n => n.sel = false);
+  p.n.sel = true;
+  const el = document.getElementById('detail');
+  if (p.n.hub) {
+    const members = nodes.filter(n => !n.hub && n.bucket === p.n.label.toLowerCase());
+    document.getElementById('detail-type').textContent = 'HUB — ' + p.n.label;
+    document.getElementById('detail-title').textContent = members.length + ' entries orbiting this bucket';
+    document.getElementById('detail-meta').textContent = 'TAP ANY DOT AROUND IT TO READ ONE';
+    document.getElementById('detail-content').textContent = '';
+  } else {
+    const en = p.n.entry || {};
+    const d = en.created_at ? new Date(en.created_at) : null;
+    document.getElementById('detail-type').textContent = (p.n.isTask ? 'TASK' : (en.type || 'thought')).toUpperCase();
+    document.getElementById('detail-title').textContent = en.title || (en.content || '').slice(0, 80);
+    document.getElementById('detail-meta').textContent = (p.n.bucket || '').toUpperCase() + (d ? ' · ' + d.toLocaleString() : '');
+    document.getElementById('detail-content').innerHTML = linkify(esc(en.content || ''));
+  }
+  el.classList.add('open');
+});
+cv.addEventListener('mousemove', e => { cv.style.cursor = pick(e.clientX, e.clientY) ? 'pointer' : 'default'; });
 build([], []); draw();
 async function load() {
   const [recent, tasks] = await Promise.all([mcp('list_recent', { limit: 80 }), mcp('list_tasks', {})]);
