@@ -28,6 +28,8 @@
     .btn.secondary { background: #222; border: 1px solid #2a2a2a; color: #aaa; }
     .card { background: #161616; border: 1px solid #222; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
     .card .meta { font-size: 0.75rem; color: #555; margin-top: 8px; }
+    .expand-toggle { color: #6366f1; font-size: 0.78rem; cursor: pointer; margin-top: 8px; user-select: none; }
+    .expand-toggle:hover { color: #818cf8; }
     .card .content { font-size: 0.9rem; line-height: 1.55; color: #d4d4d4; white-space: pre-wrap; word-break: break-word; }
     .label { font-size: 0.8rem; color: #888; margin-bottom: 6px; margin-top: 14px; display: block; }
     .mic-btn { width: 80px; height: 80px; border-radius: 50%; background: #6366f1; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 20px auto; transition: transform 0.1s, background 0.1s; }
@@ -363,8 +365,21 @@ function renderCards(items, container) {
   if (!items.length) { container.innerHTML = '<p style="color:#555;font-size:0.9rem;padding:20px 0">Nothing found</p>'; return; }
   container.innerHTML = items.map(i => {
     const badge = i.bucket && BUCKETS[i.bucket] ? `<span class="badge b-${i.bucket}">${BUCKETS[i.bucket]}</span>` : '';
-    return `<div class="card"><div class="content">${escHtml(i.content.slice(0,600))}${i.content.length>600?'…':''}</div><div class="meta">${badge}${new Date(i.created_at).toLocaleString()}</div></div>`;
+    const long = i.content.length > 600;
+    const preview = escHtml(i.content.slice(0, 600));
+    const full = escHtml(i.content);
+    const toggle = long ? `<div class="expand-toggle" onclick="toggleCard(this)">▸ Show full entry</div>` : '';
+    return `<div class="card"><div class="content" data-preview="1">${preview}${long ? '…' : ''}</div>${long ? `<div class="content full" style="display:none">${full}</div>` : ''}${toggle}<div class="meta">${badge}${new Date(i.created_at).toLocaleString()}</div></div>`;
   }).join('');
+}
+function toggleCard(el) {
+  const card = el.closest('.card');
+  const prev = card.querySelector('.content[data-preview]');
+  const full = card.querySelector('.content.full');
+  const open = full.style.display !== 'none';
+  full.style.display = open ? 'none' : 'block';
+  prev.style.display = open ? 'block' : 'none';
+  el.textContent = open ? '▸ Show full entry' : '▾ Collapse';
 }
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 async function saveNote() {
