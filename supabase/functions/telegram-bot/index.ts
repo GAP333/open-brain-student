@@ -5,9 +5,8 @@ Deno.serve(async (req) => {
   let body;
   try { body = await req.json(); } catch(e) { return new Response("ok"); }
   const msg = body && body.message;
-  if (!msg || !msg.text) return new Response("ok");
+  if (!msg || (!msg.text && !msg.photo)) return new Response("ok");
   const chatId = msg.chat.id;
-  const text = msg.text.trim();
   const h = { apikey: K, Authorization: "Bearer " + K };
   const send = async (s) => {
     await fetch("https://api.telegram.org/bot" + T + "/sendMessage", {
@@ -15,6 +14,33 @@ Deno.serve(async (req) => {
       body: JSON.stringify({chat_id: chatId, text: s}),
     });
   };
+  if (msg.photo) {
+    // Telegram sends several sizes; the last is the largest
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const fr = await fetch("https://api.telegram.org/bot" + T + "/getFile?file_id=" + fileId);
+    const fj = await fr.json();
+    if (!fj.ok) { await send("Couldn't fetch that photo from Telegram."); return new Response("ok"); }
+    const dl = await fetch("https://api.telegram.org/file/bot" + T + "/" + fj.result.file_path);
+    const bytes = await dl.arrayBuffer();
+    const ext = fj.result.file_path.split(".").pop() || "jpg";
+    const name = Date.now() + "-" + fileId.slice(-8) + "." + ext;
+    const up = await fetch(U + "/storage/v1/object/brain-images/" + name, {
+      method: "POST",
+      headers: Object.assign({}, h, {"Content-Type": "image/" + (ext === "jpg" ? "jpeg" : ext)}),
+      body: bytes,
+    });
+    if (!up.ok) { await send("Photo upload failed: " + (await up.text()).slice(0, 200)); return new Response("ok"); }
+    const publicUrl = U + "/storage/v1/object/public/brain-images/" + name;
+    const caption = (msg.caption || "").trim();
+    await fetch(U + "/rest/v1/thoughts", {
+      method: "POST",
+      headers: Object.assign({}, h, {"Content-Type": "application/json", "Prefer": "return=minimal"}),
+      body: JSON.stringify({content: caption || "📷 Photo from Telegram", image_url: publicUrl, type: "photo"}),
+    });
+    await send("📷 Photo saved to your brain" + (caption ? " with your caption." : "."));
+    return new Response("ok");
+  }
+  const text = msg.text.trim();
   if (text.startsWith("/recent")) {
     const r = await fetch(U + "/rest/v1/thoughts?order=created_at.desc&limit=5", {headers: h});
     const rows = await r.json();

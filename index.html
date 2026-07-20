@@ -369,7 +369,8 @@ function renderCards(items, container) {
     const preview = escHtml(i.content.slice(0, 600));
     const full = escHtml(i.content);
     const toggle = long ? `<div class="expand-toggle" onclick="toggleCard(this)">▸ Show full entry</div>` : '';
-    return `<div class="card"><div class="content" data-preview="1">${preview}${long ? '…' : ''}</div>${long ? `<div class="content full" style="display:none">${full}</div>` : ''}${toggle}<div class="meta">${badge}${new Date(i.created_at).toLocaleString()}</div></div>`;
+    const img = i.image_url ? `<a href="${escHtml(i.image_url)}" target="_blank"><img src="${escHtml(i.image_url)}" loading="lazy" style="max-width:100%;max-height:280px;border-radius:8px;margin-bottom:8px;display:block" /></a>` : '';
+    return `<div class="card">${img}<div class="content" data-preview="1">${preview}${long ? '…' : ''}</div>${long ? `<div class="content full" style="display:none">${full}</div>` : ''}${toggle}<div class="meta">${badge}${new Date(i.created_at).toLocaleString()}</div></div>`;
   }).join('');
 }
 function toggleCard(el) {

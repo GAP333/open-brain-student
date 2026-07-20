@@ -132,7 +132,7 @@ function preview(rows: any[]) {
   });
 }
 
-const COLS = "id,content,title,type,tags,category,summary,bucket,created_at";
+const COLS = "id,content,title,type,tags,category,summary,bucket,image_url,created_at";
 
 async function getThought(id: string) {
   const res = await fetch(
@@ -288,6 +288,13 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch (_e) { return new Response(JSON.stringify({ error: "Bad JSON" }), { status: 400, headers: CORS }); }
 
   const { method, id, params } = body;
+
+  // JSON-RPC notifications (no id, e.g. notifications/initialized) must get
+  // 202 with no body per MCP streamable HTTP — replying breaks strict clients.
+  if (id === undefined && typeof method === "string" && method.startsWith("notifications/")) {
+    return new Response(null, { status: 202, headers: CORS });
+  }
+
   let result;
 
   if (method === "tools/list") {
@@ -323,7 +330,7 @@ Deno.serve(async (req) => {
       result = { saved: await addEntry(raw, "thought", null, body.bucket) };
     }
   } else if (method === "initialize") {
-    result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "open-brain", version: "3.3.0" } };
+    result = { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "open-brain", version: "3.3.1" } };
   } else {
     result = { error: "Unknown method: " + method };
   }
